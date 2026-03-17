@@ -117,7 +117,7 @@ black-box-optimization/
 │   ├── function_1/ … function_8/   # initial_inputs.npy, initial_outputs.npy each
 │
 ├── src/
-│   ├── optimizers/              # bayesian/ (my_gp_skopt.py); wrappers/ (optuna, hebo, hyperopt, turbo, ray_tune)
+│   ├── optimizers/              # bayesian/ (my_gp_skopt.py); wrappers/ (optuna, turbo, ga, hebo, hyperopt, ray_tune)
 │   │   └── bayesian/              # acquisition_functions.py (UCB, EI, PI, Thompson Sampling, Entropy Search)
 │   └── utils/
 │       ├── load_challenge_data.py # load_function_data(N), assert_not_under_initial_data — read-only guard
@@ -131,7 +131,7 @@ black-box-optimization/
 ├── data/results/                  # Exported plots (when IF_EXPORT_PLOT = True; see Write safety below)
 │
 ├── notebooks/
-│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options — 3 GP kernels, all acquisitions, baselines; observation scatter coloured by y (norm from obs. range), grey edges; §6 summary: left=obs by y, right=IDW+white markers+best "+"
+│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options — 3 GP kernels, all acquisitions, baselines; §6 MyBO vs Optuna/TuRBO/GA; best obs as blue "+" on both panels
 │   ├── function_2_Mystery-ML-Model.ipynb         # F2 (2D): d=2 template — 3 kernels, ensemble, configurable bounds
 │   ├── function_3_Drug-Discovery.ipynb           # F3 (3D): d≥3 template — pairwise projections, GP slices, ensemble
 │   ├── function_4_Warehouse-Logistics.ipynb      # F4 (4D): 6 pairwise plots, GP slices, per-row colorbars
@@ -159,7 +159,7 @@ black-box-optimization/
 │   ├── Capstone_Project_FAQs.md  # Capstone FAQs: data, submission, method
 │   └── TECHNICAL_FOUNDATIONS.md  # Justification, key papers, library choices (see § References)
 │
-├── scripts/                     # append_week{1..6}_results.py; run_optimizers_on_data.py — compare MyBO vs Optuna on your data
+├── scripts/                     # append_week{1..6}_results.py; run_optimizers_on_data.py — compare MyBO vs Optuna/TuRBO/GA etc.
 │
 ├── docs_private/                 # Private notes (gitignored; structure not listed)
 ├── submission-template/          # Data sheet, model card, README for portfolio
@@ -167,7 +167,7 @@ black-box-optimization/
 └── README.md
 ```
 
-**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Function 1** retains the original full-options layout; its observation plots use a colour scale built from the **observation** y range (not the IDW grid) so points span the colormap; left-panel points have grey edges for visibility; Section 6 summary left panel shows observations coloured by y with no separate best '+' marker; right panel shows IDW contour with white markers and best '+' highlighted. F3–F8 use coarser visualisation grids (`n_grid_viz`) for fast plotting and finer Sobol candidate sets (`n_cand`, always a power of 2) for acquisition. d≥3 notebooks feature 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (`docs_private/notebooks/`) is a 1D tutorial. See `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md` for the full adaptation guide.
+**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Section 6** in every notebook is **MyBO vs Open Source**: comparison of this notebook’s suggestion (MyBO) with Optuna, TuRBO, and GA; observations and solver suggestions are overlaid, with the **best observation** marked by a blue “+” on all panels. **Function 1** keeps the original full-options layout; its observation scatter uses a colour scale from the **observation** y range (not the IDW grid), with grey edges; Section 6 has left panel = observations by y + best “+”, right = IDW contour + best “+”. F3–F8 use coarser visualisation grids (`n_grid_viz`) and finer Sobol candidate sets (`n_cand`, power of 2). d≥3 notebooks use 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (`docs_private/notebooks/`) is a 1D tutorial. See `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md` for the full adaptation guide.
 
 Further details on planned components are in `docs/project_roadmap.md`.
 
@@ -196,8 +196,9 @@ You are not required to build a submission optimizer from scratch or to find the
    - **3. Visualize** — Observations, distances, GP surrogate surfaces (2D contour for d=2; 2D pairwise slices for d≥3).
    - **4. Acquisition** — EI/PI/UCB computed for all three kernels; best kernel selected by LML. `next_x_high_dist` (fallback candidate) is computed in this cell. Candidates too close to existing observations (or, when `BOUNDARY_MARGIN` > 0, near domain edges) are masked; if the acquisition argmax would fall in that set, the next query uses the high-distance fallback. If `BOUNDARY_MARGIN` is not defined (e.g. parameters cell not run), it defaults to 0. Ensemble logic (when enabled) picks the next query.
    - **5. Select next query** — Default: EI argmax from the best kernel (subject to proximity masking). Alternatives: PI, UCB, exploit, explore. A proximity check warns or switches to the high-distance candidate when the suggested point is within `MIN_DIST_THRESHOLD` of any observation.
-   - **6. Append new feedback** — After portal returns \((x,y)\), run with `IF_APPEND_DATA = True`.
-   - **7. Save suggestion** — With `IF_EXPORT_QUERIES = True`, write `next_x` to `data/submissions/function_N/`.
+   - **6. MyBO vs Open Source (Section 6)** — Compare this notebook’s `next_x` with Optuna, TuRBO, and GA; plot observations and suggestions with the best observation as a blue “+”.
+   - **7. Append new feedback** — After portal returns \((x,y)\), run with `IF_APPEND_DATA = True`.
+   - **8. Save suggestion** — With `IF_EXPORT_QUERIES = True`, write `next_x` to `data/submissions/function_N/`.
 
    **Templates:** **Function 2** is the d=2 template; **Function 4** is the d≥3 template (all F3–F8 are fully adapted). **Function 1** retains the original full-options layout. See `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md` for the full adaptation guide and checklists.
 
@@ -217,9 +218,9 @@ You are not required to build a submission optimizer from scratch or to find the
    # Optional: pip install HEBO hyperopt botorch "ray[tune]"  for all solvers
    python scripts/run_optimizers_on_data.py
    python scripts/run_optimizers_on_data.py --output data/optimizer_comparison/results.csv --functions 1 2 8
-   python scripts/run_optimizers_on_data.py --solvers my_bo optuna hebo hyperopt turbo ray_tune
+   python scripts/run_optimizers_on_data.py --solvers my_bo optuna turbo ga hebo hyperopt ray_tune
    ```
-   Data from `data/problems/function_N/observations.csv` or `initial_data/`. Solvers: **my_bo** (classical BO), **optuna** (TPE), **hebo** (NeurIPS 2020 BBO winner), **hyperopt** (TPE), **turbo** (trust-region BO for high-d), **ray_tune** (distributed).
+   Data from `data/problems/function_N/observations.csv` or `initial_data/`. Solvers: **my_bo** (classical BO), **optuna** (TPE), **turbo** (trust-region BO), **ga** (genetic algorithm), **hebo** (NeurIPS 2020 BBO winner), **hyperopt** (TPE), **ray_tune** (distributed).
 
 ## Documentation
 
