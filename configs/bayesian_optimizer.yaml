@@ -1,0 +1,128 @@
+# MyBO (classical Bayesian optimization) hyperparameters per challenge function.
+# Keys match suggest() kwargs and notebook GP kernel params (constant_kernel_scale, etc.).
+# default is merged first; then function_1..function_8 override.
+# Used by my_gp_skopt.suggest() and the Function 1 notebook.
+
+default:
+  # Acquisition / strategy
+  output_warping: null
+  kernel: null
+  optimize_kernel: true
+  n_restarts: 10
+  length_scale_bounds: [1.0e-10, 20.0]
+  xi: 0.15
+  kappa: 3.0
+  solo_strategy: "EI"
+  use_ensemble_aquisation: true
+  agree_threshold: 0.15
+  # Candidates
+  n_cand: null
+  candidate_method: "sobol"
+  # Distance / boundary
+  min_dist_threshold: 0.05
+  boundary_margin: 0.0
+  duplicate_threshold: 0.001
+  seed: 42
+  # GP kernel (sklearn — fitting and plots)
+  constant_kernel_scale: 1.0
+  length_scale: 1.0
+  gp_alpha: 1.0e-6
+  matern_nu: 1.5
+  white_noise_level: 1.0e-3
+  constant_scale_bounds: [1.0e-10, 1.0e10]
+  white_noise_bounds: [1.0e-50, 1.0e5]
+
+# --------------------------
+# Function 1: 2D Radiation 
+# --------------------------
+function_1:
+  # Tunable (still changing until convergence)
+  solo_strategy: "UCB"
+  use_ensemble_aquisation: false
+  xi: 0.15
+  kappa: 3.0
+  # Acquistion / strategy 
+  output_warping: "none"
+  kernel: null
+  optimize_kernel: true
+  n_restarts: 20
+  length_scale_bounds: [1.0e-10, 20.0]
+  agree_threshold: 0.15
+  # Candidates
+  n_cand: 40000
+  candidate_method: "lhs"
+  # Distance / boundary
+  min_dist_threshold: 0.01
+  boundary_margin: 0.05
+  duplicate_threshold: 0.001
+  seed: 42
+  # GP kernel (sklearn — fitting and plots)
+  constant_kernel_scale: 1.0
+  length_scale: 1.0
+  gp_alpha: 1.0e-6
+  matern_nu: 1.5
+  white_noise_level: 1.0e-3
+  constant_scale_bounds: [1.0e-10, 1.0e10]
+  white_noise_bounds: [1.0e-50, 1.0e5]
+
+# --------------------------
+# Function 2: 2D Mystery ML 
+# --------------------------
+function_2:
+  output_warping: null
+  boundary_margin: 0.05
+  xi: 0.18
+  min_dist_threshold: 0.05
+
+# --------------------------
+# Function 3: 3D Drug discovery 
+# --------------------------
+function_3:
+  output_warping: null
+  boundary_margin: 0.05
+  min_dist_threshold: 0.05
+
+
+# --------------------------
+# Function 4: 4D Warehouse 
+# --------------------------
+function_4:
+  output_warping: null
+  boundary_margin: 0.0
+  min_dist_threshold: 0.05
+
+
+# --------------------------
+# Function 5: 4D Chemical yield 
+# --------------------------
+function_5:
+  output_warping: "log"
+  boundary_margin: 0.0
+  min_dist_threshold: 0.05
+
+# --------------------------
+# Function 6: 5D Recipe 
+# --------------------------
+function_6:
+  output_warping: null
+  boundary_margin: 0.0
+  min_dist_threshold: 0.05
+  n_cand: 32768
+
+# --------------------------
+# Function 7: 6D Hyperparameter tuning 
+# --------------------------
+function_7:
+  output_warping: "log"
+  boundary_margin: 0.0
+  min_dist_threshold: 0.05
+  n_cand: 65536
+
+# --------------------------
+# Function 8: 8D High-dimensional ML
+# --------------------------
+function_8:
+  output_warping: null
+  boundary_margin: 0.0
+  min_dist_threshold: 0.05
+  n_cand: 65536

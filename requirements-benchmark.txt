@@ -1,0 +1,4 @@
+# Optional: run external HPO solvers on your data (scripts/run_optimizers_on_data.py)
+# pip install -r requirements-benchmark.txt
+# For all solvers: pip install optuna HEBO hyperopt botorch "ray[tune]"
+optuna>=3.0

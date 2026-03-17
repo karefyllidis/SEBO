@@ -117,7 +117,7 @@ black-box-optimization/
 │   ├── function_1/ … function_8/   # initial_inputs.npy, initial_outputs.npy each
 │
 ├── src/
-│   ├── optimizers/
+│   ├── optimizers/              # bayesian/ (my_gp_skopt.py); wrappers/ (optuna, hebo, hyperopt, turbo, ray_tune)
 │   │   └── bayesian/              # acquisition_functions.py (UCB, EI, PI, Thompson Sampling, Entropy Search)
 │   └── utils/
 │       ├── load_challenge_data.py # load_function_data(N), assert_not_under_initial_data — read-only guard
@@ -131,7 +131,7 @@ black-box-optimization/
 ├── data/results/                  # Exported plots (when IF_EXPORT_PLOT = True; see Write safety below)
 │
 ├── notebooks/
-│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options — 3 GP kernels, all acquisitions, baselines
+│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options — 3 GP kernels, all acquisitions, baselines; observation scatter coloured by y (norm from obs. range), grey edges; §6 summary: left=obs by y, right=IDW+white markers+best "+"
 │   ├── function_2_Mystery-ML-Model.ipynb         # F2 (2D): d=2 template — 3 kernels, ensemble, configurable bounds
 │   ├── function_3_Drug-Discovery.ipynb           # F3 (3D): d≥3 template — pairwise projections, GP slices, ensemble
 │   ├── function_4_Warehouse-Logistics.ipynb      # F4 (4D): 6 pairwise plots, GP slices, per-row colorbars
@@ -142,6 +142,12 @@ black-box-optimization/
 │
 ├── run_all.py                  # Print submission summary; optional: --execute-notebooks, --skip-scripts
 ├── configs/
+│   ├── bayesian_optimizer.yaml    # MyBO hyperparameters per function
+│   ├── optuna_optimizer.yaml      # Optuna (TPE/CMA-ES) hyperparameters
+│   ├── hebo_optimizer.yaml        # HEBO (NeurIPS 2020 BBO) hyperparameters
+│   ├── hyperopt_optimizer.yaml    # Hyperopt (TPE) hyperparameters
+│   ├── turbo_optimizer.yaml       # TuRBO (BoTorch) hyperparameters
+│   ├── ray_tune_optimizer.yaml    # Ray Tune (OptunaSearch) hyperparameters
 │   └── problems/                  # (optional) problem configs; see docs_private/project_log.md
 │
 ├── tests/
@@ -153,7 +159,7 @@ black-box-optimization/
 │   ├── Capstone_Project_FAQs.md  # Capstone FAQs: data, submission, method
 │   └── TECHNICAL_FOUNDATIONS.md  # Justification, key papers, library choices (see § References)
 │
-├── scripts/                     # append_week{1..6}_results.py — append portal feedback to observations.csv
+├── scripts/                     # append_week{1..6}_results.py; run_optimizers_on_data.py — compare MyBO vs Optuna on your data
 │
 ├── docs_private/                 # Private notes (gitignored; structure not listed)
 ├── submission-template/          # Data sheet, model card, README for portfolio
@@ -161,7 +167,7 @@ black-box-optimization/
 └── README.md
 ```
 
-**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Function 1** retains the original full-options layout. F3–F8 use coarser visualisation grids (`n_grid_viz`) for fast plotting and finer Sobol candidate sets (`n_cand`, always a power of 2) for acquisition. d≥3 notebooks feature 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (`docs_private/notebooks/`) is a 1D tutorial. See `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md` for the full adaptation guide.
+**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Function 1** retains the original full-options layout; its observation plots use a colour scale built from the **observation** y range (not the IDW grid) so points span the colormap; left-panel points have grey edges for visibility; Section 6 summary left panel shows observations coloured by y with no separate best '+' marker; right panel shows IDW contour with white markers and best '+' highlighted. F3–F8 use coarser visualisation grids (`n_grid_viz`) for fast plotting and finer Sobol candidate sets (`n_cand`, always a power of 2) for acquisition. d≥3 notebooks feature 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (`docs_private/notebooks/`) is a 1D tutorial. See `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md` for the full adaptation guide.
 
 Further details on planned components are in `docs/project_roadmap.md`.
 
@@ -204,6 +210,16 @@ You are not required to build a submission optimizer from scratch or to find the
    By default this runs any scripts in `scripts/` (e.g. `append_week1_results.py` through `append_week6_results.py` to append portal feedback to `data/problems/function_N/observations.csv`), then prints a **submission summary**: full portal strings (copy-paste per function) and where files live. Options:
    - `python run_all.py --execute-notebooks` — run all 8 function notebooks (writes `data/submissions/function_N/`; needs `nbconvert`).
    - `python run_all.py --skip-scripts` — skip running any scripts in `scripts/` (if present); only show the summary.
+
+6. **Compare with other optimizers** — Run your BO and external HPO libs on the same challenge data:
+   ```bash
+   pip install -r requirements-benchmark.txt   # Optuna (core)
+   # Optional: pip install HEBO hyperopt botorch "ray[tune]"  for all solvers
+   python scripts/run_optimizers_on_data.py
+   python scripts/run_optimizers_on_data.py --output data/optimizer_comparison/results.csv --functions 1 2 8
+   python scripts/run_optimizers_on_data.py --solvers my_bo optuna hebo hyperopt turbo ray_tune
+   ```
+   Data from `data/problems/function_N/observations.csv` or `initial_data/`. Solvers: **my_bo** (classical BO), **optuna** (TPE), **hebo** (NeurIPS 2020 BBO winner), **hyperopt** (TPE), **turbo** (trust-region BO for high-d), **ray_tune** (distributed).
 
 ## Documentation
 

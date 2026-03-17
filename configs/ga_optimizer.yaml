@@ -1,0 +1,33 @@
+# GA/Evolutionary suggest: differential_evolution to maximize GP-EI (or GP mean).
+# default is merged first; then function_1..function_8 override.
+# Used by ga_solver.suggest() and the Function 1 notebook (Section 6).
+
+default:
+  acquisition: "ei"   # "ei" (Expected Improvement) or "mean"
+  xi: 0.01
+  seed: 42
+  popsize: 15
+  maxiter: 100
+  atol: 0.0
+  tol: 1.0e-6
+
+# Function 1: 2D Radiation
+function_1:
+  acquisition: "ei"
+  xi: 0.01
+  seed: 42
+  popsize: 15
+  maxiter: 100
+
+# Function 2: 2D Mystery ML
+function_2:
+  acquisition: "ei"
+  seed: 42
+
+# Function 3–8: inherit default (optional overrides)
+function_3: {}
+function_4: {}
+function_5: {}
+function_6: {}
+function_7: {}
+function_8: {}

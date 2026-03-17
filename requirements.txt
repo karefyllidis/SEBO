@@ -3,3 +3,4 @@ matplotlib>=3.7
 scipy>=1.10
 scikit-learn>=1.2
 scikit-optimize>=0.9
+PyYAML>=6.0

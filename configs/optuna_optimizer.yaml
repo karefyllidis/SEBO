@@ -1,0 +1,58 @@
+# Optuna (TPE / CMA-ES / random) hyperparameters per challenge function.
+# Keys match suggest() kwargs. default is merged first; then function_1..function_8 override.
+# Used by optuna_solver.suggest(), the Function 1 notebook (Section 6), and scripts/run_optimizers_on_data.py.
+
+default:
+  sampler: "tpe"
+  n_startup_trials: 10
+  seed: 42
+  # TPE-only (ignored for cmaes/random): number of candidate samples to compute EI
+  n_ei_candidates: 24
+
+# Function 1: 2D Radiation — small budget; fewer startup trials
+function_1:
+  sampler: "tpe"
+  n_startup_trials: 8
+  seed: 42
+
+# Function 2: 2D Mystery ML
+function_2:
+  sampler: "tpe"
+  n_startup_trials: 10
+  seed: 42
+
+# Function 3: 3D Drug discovery
+function_3:
+  sampler: "tpe"
+  n_startup_trials: 10
+  seed: 42
+
+# Function 4: 4D Warehouse
+function_4:
+  sampler: "tpe"
+  n_startup_trials: 12
+  seed: 42
+
+# Function 5: 4D Chemical yield
+function_5:
+  sampler: "tpe"
+  n_startup_trials: 10
+  seed: 42
+
+# Function 6: 5D Recipe
+function_6:
+  sampler: "tpe"
+  n_startup_trials: 12
+  seed: 42
+
+# Function 7: 6D Hyperparameter tuning
+function_7:
+  sampler: "tpe"
+  n_startup_trials: 15
+  seed: 42
+
+# Function 8: 8D High-dimensional ML
+function_8:
+  sampler: "tpe"
+  n_startup_trials: 20
+  seed: 42

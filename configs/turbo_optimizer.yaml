@@ -1,0 +1,54 @@
+# TuRBO (BoTorch) hyperparameters per challenge function.
+# Keys match suggest() kwargs. default is merged first; then function_1..function_8 override.
+# acqf: "ts" (Thompson sampling) or "ei" (Expected Improvement).
+# Used by turbo_solver.suggest() and the Function 1 notebook (Section 6).
+
+default:
+  acqf: "ts"
+  seed: 42
+  num_restarts: 10
+  raw_samples: 512
+  n_candidates: null   # for TS: min(5000, max(2000, 200*d)); null = auto
+
+# Function 1: 2D Radiation
+function_1:
+  acqf: "ts"
+  seed: 42
+
+# Function 2: 2D Mystery ML
+function_2:
+  acqf: "ts"
+  seed: 42
+
+# Function 3: 3D Drug discovery
+function_3:
+  acqf: "ts"
+  seed: 42
+
+# Function 4: 4D Warehouse
+function_4:
+  acqf: "ts"
+  seed: 42
+
+# Function 5: 4D Chemical yield
+function_5:
+  acqf: "ts"
+  seed: 42
+
+# Function 6: 5D Recipe
+function_6:
+  acqf: "ei"
+  seed: 42
+  num_restarts: 15
+
+# Function 7: 6D Hyperparameter tuning
+function_7:
+  acqf: "ei"
+  seed: 42
+  num_restarts: 15
+
+# Function 8: 8D High-dimensional ML
+function_8:
+  acqf: "ei"
+  seed: 42
+  num_restarts: 20
