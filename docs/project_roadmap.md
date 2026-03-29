@@ -34,7 +34,7 @@ black-box-optimization/
 │   ├── function_7_Hyperparameter-Tuning.ipynb    # F7 (6D): §6 solver comparison, §7 append
 │   └── function_8_High-dimensional-ML-Model.ipynb # F8 (8D): §6 solver comparison, §7 append
 │
-├── run_all.py                   # Submission summary (portal strings); --execute-notebooks runs all 8 notebooks
+├── run_all.py                   # Runs scripts + all 8 notebooks, prints portal strings; --skip-notebooks to skip execution
 ├── scripts/                     # append_week{1..7}_results.py — portal feedback → observations.csv; run_optimizers_on_data.py
 ├── configs/
 │   ├── optuna_optimizer.yaml     # Per-function Optuna defaults (notebook §6 still passes explicit sampler/seed where needed)
@@ -79,7 +79,7 @@ black-box-optimization/
 
 For step-by-step adaptation checklists, see `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md`.
 
-**run_all.py** — Run from project root. Runs any `scripts/*.py` (e.g. append_week1..7_results.py), then prints full portal strings for functions 1–8 and file paths. Use `--execute-notebooks` to run all 8 notebooks (generates submissions); `--skip-scripts` to skip running scripts.
+**run_all.py** — Run from project root. Runs any `scripts/*.py` (e.g. append_week1..7_results.py), executes all 8 notebooks (generates submissions), then prints full portal strings for functions 1–8 and file paths. Use `--skip-notebooks` to skip notebook execution (show saved summary only); `--skip-scripts` to skip running scripts.
 
 Write safety: `assert_not_under_initial_data(path, project_root)` only forbids writes under `project_root/initial_data/`; `data/results/`, `data/submissions/`, `data/problems/` are allowed.
 

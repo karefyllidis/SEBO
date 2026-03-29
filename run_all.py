@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run scripts, optionally execute notebooks, then print submission summary. Run from project root."""
+"""Run scripts, execute notebooks, then print submission summary. Run from project root."""
 
 import argparse
 import subprocess
@@ -8,9 +8,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 
+_POST_NOTEBOOK_SCRIPTS = {"run_optimizers_on_data.py"}
 
-def run_scripts(skip=False):
+
+def run_scripts(skip=False, only_post=False):
+    """Yield (name, ok, msg) for scripts in scripts/.
+
+    If *only_post* is True, run only post-notebook scripts.
+    Otherwise run everything except post-notebook scripts.
+    """
     for p in sorted((ROOT / "scripts").glob("*.py")):
+        is_post = p.name in _POST_NOTEBOOK_SCRIPTS
+        if only_post and not is_post:
+            continue
+        if not only_post and is_post:
+            continue
         if skip:
             yield p.name, True, "skipped"
             continue
@@ -56,7 +68,6 @@ def submission_summary():
             portal[n] = "-".join(f"{x:.6f}" for x in np.load(npy).ravel())
         else:
             portal[n] = "(not generated)"
-    # Warn if appended data is missing — notebooks then fall back to initial_data only and may suggest the same point again
     missing = []
     for n in range(1, 9):
         fn_dir = problems_dir / f"function_{n}"
@@ -75,25 +86,37 @@ def submission_summary():
 
 
 def main():
-    p = argparse.ArgumentParser(description="Run scripts, optionally notebooks; print submission summary.")
-    p.add_argument("--execute-notebooks", action="store_true", help="Execute all 8 function notebooks")
+    p = argparse.ArgumentParser(description="Run scripts, execute notebooks, print submission summary.")
+    p.add_argument("--skip-notebooks", action="store_true", help="Skip notebook execution; only show saved summary")
     p.add_argument("--skip-scripts", action="store_true", help="Skip scripts/; only show summary")
     args = p.parse_args()
 
     print("run_all.py", ROOT, "\n")
 
+    # Phase 1: data-prep scripts (append_week*.py etc.)
     if (ROOT / "scripts").exists():
-        print("Scripts:")
-        for name, ok, msg in run_scripts(skip=args.skip_scripts):
+        print("Data scripts:")
+        for name, ok, msg in run_scripts(skip=args.skip_scripts, only_post=False):
             print(f"  [{'OK' if ok else 'FAIL'}] {name}: {msg}")
         print()
 
-    if args.execute_notebooks:
+    # Phase 2: execute notebooks (compute + save submissions)
+    if not args.skip_notebooks:
         print("Notebooks:")
         for name, ok, msg in execute_notebooks():
             print(f"  [{'OK' if ok else 'FAIL'}] {name}: {msg}")
         print()
 
+    # Phase 3: post-notebook scripts (run_optimizers_on_data.py — comparison)
+    if (ROOT / "scripts").exists():
+        post = list(run_scripts(skip=args.skip_scripts, only_post=True))
+        if post:
+            print("Comparison scripts:")
+            for name, ok, msg in post:
+                print(f"  [{'OK' if ok else 'FAIL'}] {name}: {msg}")
+            print()
+
+    # Phase 4: portal summary from freshly written files
     portal = submission_summary()
     print("=" * 60)
     print("SUBMISSION — portal strings (copy-paste per function)")

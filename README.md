@@ -140,7 +140,7 @@ black-box-optimization/
 │   ├── function_7_Hyperparameter-Tuning.ipynb    # F7 (6D): 15 pairwise plots, per-row colorbars
 │   └── function_8_High-dimensional-ML-Model.ipynb # F8 (8D): 28 pairwise plots, per-row colorbars
 │
-├── run_all.py                  # Print submission summary; optional: --execute-notebooks, --skip-scripts
+├── run_all.py                  # Run scripts + notebooks, print portal strings; --skip-notebooks, --skip-scripts
 ├── configs/
 │   ├── bayesian_optimizer.yaml    # MyBO hyperparameters per function
 │   ├── optuna_optimizer.yaml      # Optuna defaults per function (sampler, seeds); TPE uses multivariate=True; GPSampler via wrapper (see below)
@@ -208,9 +208,9 @@ You are not required to build a submission optimizer from scratch or to find the
    ```bash
    python run_all.py
    ```
-   By default this runs any scripts in `scripts/` (e.g. `append_week1_results.py` through `append_week7_results.py` to append portal feedback to `data/problems/function_N/observations.csv`), then prints a **submission summary**: full portal strings (copy-paste per function) and where files live. Options:
-   - `python run_all.py --execute-notebooks` — run all 8 function notebooks (writes `data/submissions/function_N/`; needs `nbconvert`).
-   - `python run_all.py --skip-scripts` — skip running any scripts in `scripts/` (if present); only show the summary.
+   By default this runs any scripts in `scripts/` (e.g. `append_week1_results.py` through `append_week7_results.py` to append portal feedback to `data/problems/function_N/observations.csv`), executes all 8 notebooks (writes `data/submissions/function_N/`; needs `nbconvert`), then prints a **submission summary**: full portal strings (copy-paste per function) and where files live. Options:
+   - `python run_all.py --skip-notebooks` — skip notebook execution; only show the previously saved summary.
+   - `python run_all.py --skip-scripts` — skip running any scripts in `scripts/` (if present).
 
 6. **Compare with other optimizers** — Run your BO and external HPO libs on the same challenge data:
    ```bash
