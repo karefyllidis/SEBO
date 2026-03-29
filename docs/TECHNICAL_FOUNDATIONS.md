@@ -38,7 +38,7 @@ Short reference for the main justification, key literature, and library choices 
 ## Where this is documented in the repo
 
 - **README.md** — §1–4: overview, inputs/outputs, technical approach; project structure; References: NeurIPS 2020 BBO, starter kit, sample repos.
-- **docs/project_roadmap.md** — Structure, notebook workflow, planned components; Section 6 (MyBO vs Optuna/TuRBO/GA), F1 visualization (observation-coloured scatter, best obs blue “+”).
+- **docs/project_roadmap.md** — Structure, notebook workflow, planned components; Section 6 (MyBO vs Optuna-TPE, Optuna-GP, TuRBO, GA), `NEXT_QUERY_SOLUTION` export flag, F1 visualization (observation-coloured scatter, best obs blue “+”).
 - **docs/Capstone_Project_FAQs.md** — Capstone-specific FAQs.
 - **Notebooks** — Parameters cell per function: kernel choice, `OUTPUT_WARPING`, acquisition coefficients, sampling method. Section markdown in each notebook describes that section (e.g. Function 1 §2 and §6 document the two-panel observation and solver-comparison plots). See README and project_roadmap for default scaling (F1, F5, F7: `"log"`; others: `None`).
 - **submission-template/** — Data sheet and model card for portfolio deliverable (summarise approach and point to README and references).

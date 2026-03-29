@@ -12,8 +12,10 @@ How it works
 Existing observations are added to an Optuna study as completed trials
 (FrozenTrial). The study then asks for one new trial; we read the suggested
 continuous parameters (suggest_float) and return them as a single next point.
-Samplers: "tpe" (Tree-structured Parzen Estimator, default), "cmaes", or
-"random". The study direction is "maximize" to match the BBO challenge.
+Samplers: "tpe" (Tree-structured Parzen Estimator, default, multivariate mode),
+"gp" (GPSampler — GP+EI, direct comparison with MyBO, requires optuna>=3.6),
+"cmaes" (CMA-ES evolution strategy), or "random" (baseline).
+The study direction is "maximize" to match the BBO challenge.
 
 Dependency
 ----------
@@ -102,6 +104,12 @@ def load_optuna_config(
     return out
 
 
+# Sentinel to distinguish "caller explicitly passed a value" from "using the function default".
+# This is necessary because the YAML config also sets sampler/seed/n_startup_trials, and we
+# need explicit kwargs to win over YAML while still letting YAML win over function defaults.
+_UNSET: Any = object()
+
+
 def suggest(
     X: np.ndarray,
     y: np.ndarray,
@@ -110,9 +118,9 @@ def suggest(
     config_path: str | Path | None = None,
     function_id: int | None = None,
     config: dict[str, Any] | None = None,
-    sampler: str = "tpe",
-    n_startup_trials: int = 10,
-    seed: int = 42,
+    sampler: Any = _UNSET,
+    n_startup_trials: Any = _UNSET,
+    seed: Any = _UNSET,
     **kwargs: Any,
 ) -> np.ndarray:
     """
@@ -133,13 +141,15 @@ def suggest(
     config : dict or None
         Pre-loaded hyperparameter dict (e.g. from load_optuna_config()). Overridden by explicit kwargs.
     sampler : str
-        "tpe" (default) or "cmaes" or "random". Overridden by config when function_id/config_path set.
+        "tpe" (default, multivariate) | "gp" (GP+EI, direct MyBO comparison) |
+        "cmaes" | "random". Explicit value always overrides the YAML config.
     n_startup_trials : int
-        Number of random trials before TPE (if sampler is tpe).
+        Number of random trials before TPE kicks in (if sampler is "tpe").
+        Explicit value always overrides the YAML config.
     seed : int
-        Random seed.
+        Random seed. Explicit value always overrides the YAML config.
     **kwargs
-        Any of sampler, n_startup_trials, seed; override config and the above defaults.
+        Forwarded to sampler construction (ignored for unknown keys).
 
     Returns
     -------
@@ -149,22 +159,29 @@ def suggest(
     if not _OPTUNA_AVAILABLE:
         raise ImportError("Optuna is required for optuna_solver. Install with: pip install optuna")
 
-    # Config file + optional config dict; then explicit sampler/n_startup_trials/seed (and kwargs) override
+    # Priority order (highest → lowest):
+    #   1. Explicit named kwargs passed by the caller  (sampler="gp" in notebook)
+    #   2. **kwargs overrides                          (unlikely but supported)
+    #   3. YAML / config dict values                   (configs/optuna_optimizer.yaml)
+    #   4. Built-in defaults                           ("tpe", 10, 42)
     cfg: dict[str, Any] = load_optuna_config(config_path=config_path, function_id=function_id)
     if isinstance(config, dict):
         cfg = {**cfg, **config}
-    # Signature defaults override config only when caller passes them (we can't detect that, so we apply defaults)
-    # so that suggest(X, y) works without a config file. When config_path/function_id is used, config wins unless
-    # the caller passes e.g. seed=0.
-    cfg.setdefault("sampler", sampler)
-    cfg.setdefault("n_startup_trials", n_startup_trials)
-    cfg.setdefault("seed", seed)
-    cfg["sampler"] = kwargs.get("sampler", cfg["sampler"])
-    cfg["n_startup_trials"] = kwargs.get("n_startup_trials", cfg["n_startup_trials"])
-    cfg["seed"] = kwargs.get("seed", cfg["seed"])
+    # **kwargs also override YAML (level 2)
     for k, v in kwargs.items():
-        if k not in ("sampler", "n_startup_trials", "seed"):
-            cfg[k] = v
+        cfg[k] = v
+    # Explicit named parameters override everything (level 1)
+    if sampler is not _UNSET:
+        cfg["sampler"] = sampler
+    if n_startup_trials is not _UNSET:
+        cfg["n_startup_trials"] = n_startup_trials
+    if seed is not _UNSET:
+        cfg["seed"] = seed
+    # Apply built-in defaults for anything still missing
+    cfg.setdefault("sampler", "tpe")
+    cfg.setdefault("n_startup_trials", 10)
+    cfg.setdefault("seed", 42)
+
     sampler = str(cfg.get("sampler", "tpe"))
     n_startup_trials = int(cfg.get("n_startup_trials", 10))
     seed = int(cfg.get("seed", 42))
@@ -185,17 +202,44 @@ def suggest(
         else:
             X_01[:, j] = (X[:, j] - lo) / (hi - lo)
 
+    # Silence study-creation INFO messages and the multivariate experimental warning
+    import warnings
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
+
     if sampler == "tpe":
+        # multivariate=True fits a joint density over all dimensions; strictly better
+        # than the default univariate mode which treats each dimension independently.
         sampler_obj = optuna.samplers.TPESampler(
             n_startup_trials=min(n_startup_trials, n),
             seed=seed,
+            multivariate=True,
         )
+    elif sampler == "gp":
+        # GPSampler (Optuna ≥ 3.6): internal GP + EI loop — direct apples-to-apples
+        # comparison with MyBO (which also uses GP + EI/PI/UCB).
+        # deterministic_objective=True: assumes a noise-free objective, giving a much
+        # better-conditioned GP fit for small BBO datasets. Without this flag the default
+        # noisy GP tends to maximise EI at the search-space boundaries due to high
+        # posterior uncertainty everywhere except near observations.
+        # n_startup_trials=0: skip the random-initialisation phase so the GP is always
+        # used regardless of how many prior observations exist.
+        try:
+            sampler_obj = optuna.samplers.GPSampler(
+                seed=seed,
+                deterministic_objective=True,
+                n_startup_trials=0,
+            )
+        except AttributeError:
+            raise ImportError("GPSampler requires optuna >= 3.6. Update with: pip install -U optuna")
     elif sampler == "cmaes":
         sampler_obj = optuna.samplers.CmaEsSampler(seed=seed)
     elif sampler == "random":
         sampler_obj = optuna.samplers.RandomSampler(seed=seed)
     else:
-        sampler_obj = optuna.samplers.TPESampler(n_startup_trials=min(n_startup_trials, n), seed=seed)
+        sampler_obj = optuna.samplers.TPESampler(
+            n_startup_trials=min(n_startup_trials, n), seed=seed, multivariate=True,
+        )
 
     study = optuna.create_study(direction="maximize", sampler=sampler_obj)
 
