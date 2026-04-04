@@ -131,7 +131,7 @@ black-box-optimization/
 ├── data/results/                  # Exported plots (when IF_EXPORT_PLOT = True; see Write safety below)
 │
 ├── notebooks/
-│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options — 3 GP kernels, all acquisitions, baselines; §6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / GA; best obs as blue "+" on both panels
+│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options — 3 GP kernels, all acquisitions, baselines; §6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / DE-GP-EI; best obs as blue "+" on both panels
 │   ├── function_2_Mystery-ML-Model.ipynb         # F2 (2D): d=2 template — 3 kernels, ensemble, configurable bounds
 │   ├── function_3_Drug-Discovery.ipynb           # F3 (3D): d≥3 template — pairwise projections, GP slices, ensemble
 │   ├── function_4_Warehouse-Logistics.ipynb      # F4 (4D): 6 pairwise plots, GP slices, per-row colorbars
@@ -159,7 +159,7 @@ black-box-optimization/
 │   ├── Capstone_Project_FAQs.md  # Capstone FAQs: data, submission, method
 │   └── TECHNICAL_FOUNDATIONS.md  # Justification, key papers, library choices (see § References)
 │
-├── scripts/                     # append_week{1..7}_results.py; run_optimizers_on_data.py — bench MyBO vs Optuna (TPE) / TuRBO / GA on CSV data
+├── scripts/                     # append_week{1..N}_results.py; run_optimizers_on_data.py — bench MyBO vs Optuna (TPE) / TuRBO / DE-GP-EI on CSV data
 │
 ├── docs_private/                 # Private notes (gitignored; structure not listed)
 ├── submission-template/          # Data sheet, model card, README for portfolio
@@ -167,7 +167,7 @@ black-box-optimization/
 └── README.md
 ```
 
-**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Section 6** in every notebook is **MyBO vs Open Source**: comparison of this notebook’s `next_x` (MyBO) with **Optuna-TPE**, **Optuna-GP** (Optuna’s `GPSampler`, GP-style acquisition), **TuRBO**, and **GA**; observations and solver suggestions are overlaid, with the **best observation** marked by a blue “+” on all panels. After §6, set **`NEXT_QUERY_SOLUTION`** (`'MyBO'` \| `'Optuna-TPE'` \| `'Optuna-GP'` \| `'TuRBO'` \| `'GA'`) in a dedicated cell so the **save** step writes that solver’s vector to `data/submissions/function_N/` (run §6 first if you export anything other than MyBO). **`IF_EXPORT_PLOT`** defaults to **False** in notebooks (set True to write figures under `data/results/`). **Function 1** keeps the original full-options layout; its observation scatter uses a colour scale from the **observation** y range (not the IDW grid), with grey edges; Section 6 has left panel = observations by y + best “+”, right = IDW contour + best “+”. F3–F8 use coarser visualisation grids (`n_grid_viz`) and finer Sobol candidate sets (`n_cand`, power of 2). d≥3 notebooks use 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (`docs_private/notebooks/`) is a 1D tutorial. See `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md` for the full adaptation guide.
+**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Section 6** in every notebook is **MyBO vs Open Source**: comparison of this notebook’s `next_x` (MyBO) with **Optuna-TPE**, **Optuna-GP** (Optuna’s `GPSampler`, GP-style acquisition), **TuRBO**, and **DE-GP-EI** (scipy `differential_evolution` on GP Expected Improvement; notebooks label this solver **DE-GP-EI**; the import module remains `ga_solver`); observations and solver suggestions are overlaid, with the **best observation** marked by a blue “+” on all panels. After §6, set **`NEXT_QUERY_SOLUTION`** (`'MyBO'` \| `'Optuna-TPE'` \| `'Optuna-GP'` \| `'TuRBO'` \| `'DE-GP-EI'`) in a dedicated cell so the **save** step writes that solver’s vector to `data/submissions/function_N/` (run §6 first if you export anything other than MyBO). The legacy value `'GA'` is still accepted and maps to **DE-GP-EI**. **`IF_EXPORT_PLOT`** defaults to **False** in notebooks (set True to write figures under `data/results/`). **Function 1** keeps the original full-options layout; its observation scatter uses a colour scale from the **observation** y range (not the IDW grid), with grey edges; Section 6 has left panel = observations by y + best “+”, right = IDW contour + best “+”. F3–F8 use coarser visualisation grids (`n_grid_viz`) and finer Sobol candidate sets (`n_cand`, power of 2). d≥3 notebooks use 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (`docs_private/notebooks/`) is a 1D tutorial. See `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md` for the full adaptation guide.
 
 Further details on planned components are in `docs/project_roadmap.md`.
 
@@ -196,7 +196,7 @@ You are not required to build a submission optimizer from scratch or to find the
    - **3. Visualize** — Observations, distances, GP surrogate surfaces (2D contour for d=2; 2D pairwise slices for d≥3).
    - **4. Acquisition** — EI/PI/UCB computed for all three kernels; best kernel selected by LML. `next_x_high_dist` (fallback candidate) is computed in this cell. Candidates too close to existing observations (or, when `BOUNDARY_MARGIN` > 0, near domain edges) are masked; if the acquisition argmax would fall in that set, the next query uses the high-distance fallback. If `BOUNDARY_MARGIN` is not defined (e.g. parameters cell not run), it defaults to 0. Ensemble logic (when enabled) picks the next query.
    - **5. Select next query** — Default: EI argmax from the best kernel (subject to proximity masking). Alternatives: PI, UCB, exploit, explore. A proximity check warns or switches to the high-distance candidate when the suggested point is within `MIN_DIST_THRESHOLD` of any observation.
-   - **6. MyBO vs Open Source (Section 6)** — Compare this notebook’s `next_x` with **Optuna-TPE** (multivariate TPE), **Optuna-GP** (`sampler="gp"` in the wrapper), **TuRBO**, and **GA**. Plot observations and suggestions; best observation as a blue “+”. Pairwise panels (d≥3) use legend text with the two displayed coordinates.
+   - **6. MyBO vs Open Source (Section 6)** — Compare this notebook’s `next_x` with **Optuna-TPE** (multivariate TPE), **Optuna-GP** (`sampler="gp"` in the wrapper), **TuRBO**, and **DE-GP-EI**. Plot observations and suggestions; best observation as a blue “+”. Pairwise panels (d≥3) use legend text with the two displayed coordinates.
    - **7. Append new feedback** — After portal returns \((x,y)\), run with `IF_APPEND_DATA = True`.
    - **8. Save suggestion** — With `IF_EXPORT_QUERIES = True`, write the vector selected by **`NEXT_QUERY_SOLUTION`** to `data/submissions/function_N/` (registry built from MyBO plus §6 `suggestions`).
 
@@ -208,7 +208,7 @@ You are not required to build a submission optimizer from scratch or to find the
    ```bash
    python run_all.py
    ```
-   By default this runs any scripts in `scripts/` (e.g. `append_week1_results.py` through `append_week7_results.py` to append portal feedback to `data/problems/function_N/observations.csv`), executes all 8 notebooks (writes `data/submissions/function_N/`; needs `nbconvert`), then prints a **submission summary**: full portal strings (copy-paste per function) and where files live. Options:
+   By default this runs any scripts in `scripts/` (e.g. `append_week1_results.py`, `append_week9_results.py`, … to append portal feedback to `data/problems/function_N/observations.csv`), executes all 8 notebooks (writes `data/submissions/function_N/`; needs `nbconvert`), then prints a **submission summary**: full portal strings (copy-paste per function) and where files live. Options:
    - `python run_all.py --skip-notebooks` — skip notebook execution; only show the previously saved summary.
    - `python run_all.py --skip-scripts` — skip running any scripts in `scripts/` (if present).
 
@@ -218,14 +218,14 @@ You are not required to build a submission optimizer from scratch or to find the
    # Optional: pip install HEBO hyperopt botorch "ray[tune]"  for all solvers
    python scripts/run_optimizers_on_data.py
    python scripts/run_optimizers_on_data.py --output data/optimizer_comparison/results.csv --functions 1 2 8
-   python scripts/run_optimizers_on_data.py --solvers my_bo optuna turbo ga hebo hyperopt ray_tune
+   python scripts/run_optimizers_on_data.py --solvers my_bo optuna turbo de_gp_ei hebo hyperopt ray_tune
    ```
-   Data from `data/problems/function_N/observations.csv` or `initial_data/`. Solvers: **my_bo** (classical BO), **optuna** (TPE per `configs/optuna_optimizer.yaml`), **turbo** (trust-region BO), **ga** (genetic algorithm), **hebo** (NeurIPS 2020 BBO winner), **hyperopt** (TPE), **ray_tune** (distributed). For **GP-style Optuna** (apples-to-apples with MyBO), use `src/optimizers/wrappers/optuna_solver.suggest(..., sampler="gp")` as in notebook §6.
+   Data from `data/problems/function_N/observations.csv` or `initial_data/`. Solvers: **my_bo** (classical BO), **optuna** (TPE per `configs/optuna_optimizer.yaml`), **turbo** (trust-region BO), **de_gp_ei** or **ga** (DE-GP-EI: differential evolution on GP-EI; same implementation), **hebo** (NeurIPS 2020 BBO winner), **hyperopt** (TPE), **ray_tune** (distributed). For **GP-style Optuna** (apples-to-apples with MyBO), use `src/optimizers/wrappers/optuna_solver.suggest(..., sampler="gp")` as in notebook §6.
 
 ### External optimizer wrappers (summary)
 
 - **`src/optimizers/wrappers/optuna_solver.py`** — `suggest(X, y, bounds, function_id=…, sampler="tpe"|"gp"|"cmaes"|"random", ...)`. **TPE** uses `multivariate=True`. **GPSampler** (`sampler="gp"`, Optuna ≥ 3.6) uses `deterministic_objective=True` and `n_startup_trials=0` so the GP is used immediately on small BBO budgets. **Important:** Any **explicit** argument you pass (e.g. `sampler="gp"`, `seed=46`) overrides values from `configs/optuna_optimizer.yaml`, so §6 can run both TPE and GP without the YAML forcing both to TPE.
-- **`turbo_solver.py`**, **`ga_solver.py`** — Same `(X, y, bounds) → x_next` contract; optional per-function YAML under `configs/`.
+- **`turbo_solver.py`**, **`ga_solver.py`** (user-facing name **DE-GP-EI**) — Same `(X, y, bounds) → x_next` contract; optional per-function YAML under `configs/` (`ga_optimizer.yaml`).
 
 ## Documentation
 

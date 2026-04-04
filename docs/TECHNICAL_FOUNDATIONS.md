@@ -32,13 +32,14 @@ Short reference for the main justification, key literature, and library choices 
 | **scikit-learn** (`GaussianProcessRegressor`) | Core GP surrogate (fit, predict mean and std) | Stable API, built-in LML-based kernel optimisation, good behaviour for small n. **GPyTorch** would scale better to large n but adds complexity and is unnecessary for our evaluation budget. |
 | **scikit-optimize (skopt)** (`gaussian_ei`, `gaussian_pi`, `gaussian_lcb`; `Sobol`, `Lhs`) | Compute EI/PI/UCB over a candidate set; generate space-filling candidates | Widely used in BO tutorials and NeurIPS 2020 starter kit; Sobol gives low-discrepancy coverage. We also implement EI/UCB/PI in `src/optimizers/bayesian/` for transparency; notebooks use skopt for consistency. |
 | **NumPy, SciPy, Matplotlib** | Numerical computation and visualisation | Standard, stable stack. **PyTorch/TensorFlow** not chosen: surrogate is a GP, not a neural network; for our data size, a GP is more data-efficient and provides uncertainty without extra machinery. |
+| **SciPy** (`scipy.optimize.differential_evolution`) | **DE-GP-EI** (`ga_solver.py`): maximise GP Expected Improvement continuously on \([0,1]^d\) | Same BO idea as the notebooks (fit GP → optimise acquisition); DE is only applied to the **surrogate** acquisition, not a genetic algorithm on the black-box \(f\). User-facing name **DE-GP-EI**; CLI `de_gp_ei` / `ga` in `run_optimizers_on_data.py`. |
 
 ---
 
 ## Where this is documented in the repo
 
 - **README.md** — §1–4: overview, inputs/outputs, technical approach; project structure; References: NeurIPS 2020 BBO, starter kit, sample repos.
-- **docs/project_roadmap.md** — Structure, notebook workflow, planned components; Section 6 (MyBO vs Optuna-TPE, Optuna-GP, TuRBO, GA), `NEXT_QUERY_SOLUTION` export flag, F1 visualization (observation-coloured scatter, best obs blue “+”).
+- **docs/project_roadmap.md** — Structure, notebook workflow, planned components; Section 6 (MyBO vs Optuna-TPE, Optuna-GP, TuRBO, DE-GP-EI), `NEXT_QUERY_SOLUTION` export flag, F1 visualization (observation-coloured scatter, best obs blue “+”).
 - **docs/Capstone_Project_FAQs.md** — Capstone-specific FAQs.
 - **Notebooks** — Parameters cell per function: kernel choice, `OUTPUT_WARPING`, acquisition coefficients, sampling method. Section markdown in each notebook describes that section (e.g. Function 1 §2 and §6 document the two-panel observation and solver-comparison plots). See README and project_roadmap for default scaling (F1, F5, F7: `"log"`; others: `None`).
 - **submission-template/** — Data sheet and model card for portfolio deliverable (summarise approach and point to README and references).
@@ -50,4 +51,4 @@ Short reference for the main justification, key literature, and library choices 
 
 - **Research:** NeurIPS 2020 BBO team write-ups (e.g. Huawei HEBO, Nvidia ensembles, JetBrains GP+SVM); TuRBO and trust-region BO for high dimensions.
 - **Benchmarks:** Bayesmark (from BBO starter kit); HPOBench or similar BO benchmarks.
-- **Software:** hyperopt, nevergrad (starter kit); GPyTorch/BoTorch if budget or dimension grows.
+- **Software:** hyperopt, nevergrad (starter kit); GPyTorch/BoTorch if budget or dimension grows; population-based optimisers on \(f\) (distinct from DE-GP-EI on GP-EI) for multimodal baselines.

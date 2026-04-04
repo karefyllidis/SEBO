@@ -6,7 +6,7 @@ Wrappers for external HPO libraries with a common suggest(X, y, bounds) interfac
 - HEBO: NeurIPS 2020 BBO winner, strong on noisy objectives
 - Hyperopt: TPE, one of the originals
 - TuRBO: trust-region BO for high dimensions (50+)
-- GA: evolutionary (differential_evolution) to maximize GP-EI; scipy only
+- DE-GP-EI: scipy differential_evolution to maximize GP-EI (module: ga_solver)
 """
 
 from .optuna_solver import load_optuna_config, suggest as optuna_suggest

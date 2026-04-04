@@ -139,11 +139,12 @@ Desktop.ini
 # Project folders
 submission-template/
 
-# Private documentation (ignored except function_0_devel)
+# Private documentation (ignored except function_0_devel + inventory)
 docs_private/*
 !docs_private/notebooks/
 docs_private/notebooks/*
 !docs_private/notebooks/function_0_devel.ipynb
+!docs_private/unused_or_removable_inventory.md
 
 # Raw data folders
 initial_data/

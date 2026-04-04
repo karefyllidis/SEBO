@@ -1,11 +1,13 @@
 """
-Genetic / evolutionary suggest: maximize GP-EI using scipy's differential_evolution.
+DE-GP-EI: maximize GP Expected Improvement using scipy's differential_evolution.
 
+User-facing name: **DE-GP-EI** (differential evolution on the GP–EI acquisition).
 Same interface as other wrappers: suggest(X, y, bounds) -> x_next (maximization).
 Fits a GP to (X, y), then uses differential_evolution to find the point that
 maximizes Expected Improvement. No extra dependencies (scipy + sklearn only).
 
-Used by the Function 1 notebook (Section 6) and scripts/run_optimizers_on_data.py.
+Used in function notebooks (Section 6) and scripts/run_optimizers_on_data.py
+(module path remains ``ga_solver`` for imports).
 """
 
 from __future__ import annotations
@@ -44,7 +46,7 @@ def load_ga_config(
     function_id: int | None = None,
     project_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Load GA/evolutionary hyperparameters from configs/ga_optimizer.yaml."""
+    """Load DE-GP-EI (differential evolution / GP-EI) hyperparameters from configs/ga_optimizer.yaml."""
     if not _YAML_AVAILABLE:
         return {}
     if config_path is None:

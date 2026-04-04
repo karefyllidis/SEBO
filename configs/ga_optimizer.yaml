@@ -1,6 +1,7 @@
-# GA/Evolutionary suggest: differential_evolution to maximize GP-EI (or GP mean).
+# DE-GP-EI: scipy differential_evolution to maximize GP-EI (or GP mean).
+# User-facing name in notebooks: DE-GP-EI (import path: ga_solver).
 # default is merged first; then function_1..function_8 override.
-# Used by ga_solver.suggest() and the Function 1 notebook (Section 6).
+# Used by ga_solver.suggest() and function notebooks Section 6.
 
 default:
   acquisition: "ei"   # "ei" (Expected Improvement) or "mean"

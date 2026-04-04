@@ -34,6 +34,15 @@ def load_problem(fid: int) -> tuple[np.ndarray, np.ndarray]:
     return load_function_data(fid)
 
 
+def _load_notebook_suggestion(fid: int) -> np.ndarray | None:
+    """Read the notebook's saved next_input_portal.txt for function *fid*."""
+    txt = ROOT / "data" / "submissions" / f"function_{fid}" / "next_input_portal.txt"
+    if not txt.exists():
+        return None
+    parts = txt.read_text().strip().split("-")
+    return np.array([float(v) for v in parts])
+
+
 def run_solvers(
     functions: list[int] | None = None,
     solvers: list[str] | None = None,
@@ -46,7 +55,7 @@ def run_solvers(
     if functions is None:
         functions = list(range(1, 9))
     if solvers is None:
-        solvers = ["my_bo", "optuna"]
+        solvers = ["notebook", "optuna"]
 
     results = {}
     for fid in functions:
@@ -59,7 +68,11 @@ def run_solvers(
 
         for name in solvers:
             try:
-                if name == "my_bo":
+                if name == "notebook":
+                    x_next = _load_notebook_suggestion(fid)
+                    if x_next is None:
+                        raise FileNotFoundError(f"no next_input_portal.txt for function_{fid}")
+                elif name == "my_bo":
                     from src.optimizers.bayesian.my_gp_skopt import suggest as my_suggest
                     x_next = my_suggest(X, y, bounds=bounds, function_id=fid, seed=seed)
                 elif name == "optuna":
@@ -74,6 +87,9 @@ def run_solvers(
                 elif name == "turbo":
                     from src.optimizers.wrappers.turbo_solver import suggest as turbo_suggest
                     x_next = turbo_suggest(X, y, bounds=bounds, function_id=fid, seed=seed)
+                elif name in ("ga", "de_gp_ei"):
+                    from src.optimizers.wrappers.ga_solver import suggest as ga_suggest
+                    x_next = ga_suggest(X, y, bounds=bounds, function_id=fid, seed=seed)
                 elif name == "ray_tune":
                     from src.optimizers.wrappers.ray_tune_solver import suggest as ray_tune_suggest
                     x_next = ray_tune_suggest(X, y, bounds=bounds, function_id=fid, seed=seed)
@@ -124,8 +140,8 @@ def main():
         "--solvers",
         type=str,
         nargs="+",
-        default=["my_bo", "optuna"],
-        help="Solvers: my_bo, optuna, hebo, hyperopt, turbo, ray_tune",
+        default=["notebook", "optuna"],
+        help="Solvers: notebook, my_bo, optuna, hebo, hyperopt, turbo, ga|de_gp_ei (DE-GP-EI), ray_tune",
     )
     p.add_argument("--output", "-o", type=Path, default=None, help="Output CSV path")
     p.add_argument("--seed", type=int, default=42)
@@ -139,7 +155,7 @@ def main():
     )
 
     # Print table
-    solvers = args.solvers or ["my_bo", "optuna"]
+    solvers = args.solvers or ["notebook", "optuna"]
     print("\n" + "=" * 70)
     print("Suggested next point per function and solver (portal format: 6 decimals, hyphen-separated)")
     print("=" * 70)

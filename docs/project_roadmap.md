@@ -12,7 +12,7 @@ black-box-optimization/
 ├── src/
 │   ├── optimizers/
 │   │   ├── bayesian/             # acquisition_functions.py (UCB, EI, PI, Thompson, Entropy Search)
-│   │   └── wrappers/             # optuna_solver.py (TPE / GPSampler), turbo_solver.py, ga_solver.py — suggest(X,y,bounds) for §6
+│   │   └── wrappers/             # optuna_solver.py (TPE / GPSampler), turbo_solver.py, ga_solver.py (DE-GP-EI) — suggest(X,y,bounds) for §6
 │   └── utils/
 │       ├── load_challenge_data.py # load_function_data(N), assert_not_under_initial_data (blocks writes under initial_data only)
 │       ├── plot_utilities.py     # style_axis, add_colorbar, style_legend, prepare_surface_for_plot, style_axis_3d; plot_2d_bo_state, plot_2d_function, plot_convergence, plot_gp_1d, plot_acquisition_1d, plot_bo_iteration_1d, plot_parallel_coordinates; DEFAULT_FONT_SIZE_*, DEFAULT_EXPORT_*
@@ -25,7 +25,7 @@ black-box-optimization/
 │   (data/results/)               # Exported plots (observations+contour, 3D surface, GP kernels, all acquisition points)
 │
 ├── notebooks/
-│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options; §6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / GA, best obs blue "+"
+│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options; §6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / DE-GP-EI, best obs blue "+"
 │   ├── function_2_Mystery-ML-Model.ipynb         # F2 (2D): d=2 template — 3 kernels, ensemble; §6 solver comparison
 │   ├── function_3_Drug-Discovery.ipynb           # F3 (3D): pairwise projections, GP slices; §6 solver comparison
 │   ├── function_4_Warehouse-Logistics.ipynb      # F4 (4D): 6 pairwise plots; §6 solver comparison, §7 append feedback
@@ -35,7 +35,7 @@ black-box-optimization/
 │   └── function_8_High-dimensional-ML-Model.ipynb # F8 (8D): §6 solver comparison, §7 append
 │
 ├── run_all.py                   # Runs scripts + all 8 notebooks, prints portal strings; --skip-notebooks to skip execution
-├── scripts/                     # append_week{1..7}_results.py — portal feedback → observations.csv; run_optimizers_on_data.py
+├── scripts/                     # append_week{N}_results.py (portal feedback → observations.csv); run_optimizers_on_data.py
 ├── configs/
 │   ├── optuna_optimizer.yaml     # Per-function Optuna defaults (notebook §6 still passes explicit sampler/seed where needed)
 │   ├── turbo_optimizer.yaml, ga_optimizer.yaml, …  # Other wrappers
@@ -59,7 +59,7 @@ black-box-optimization/
 
 **Removed for now (add back when needed):**
 - `configs/algorithms/`, `configs/experiments/` — algorithm/experiment configs
-- Scripts in `scripts/` — run_all.py runs any `scripts/*.py` (e.g. `append_week1_results.py` … `append_week7_results.py`); folder may be empty between milestones
+- Scripts in `scripts/` — `run_all.py` runs any `scripts/*.py` (e.g. `append_week1_results.py`, `append_week9_results.py`, … — one script per portal round); folder may be empty between milestones
 - `tests/test_objectives/` — we have no src/objective
 - `notebooks/weekly_review/` — weekly notes
 - `src/objective/`, `src/experiments/` — see private notes (e.g. in docs_private/)
@@ -72,14 +72,14 @@ black-box-optimization/
 4. **GP surrogate** — Fit 3 kernels (RBF, Matérn, RBF+WhiteKernel) with configurable bounds; select best by LML. 3×2 grid (mean + std). d≥3: 2D slices at median of held-out dimensions.
 5. **Acquisition** — EI/PI/UCB computed for all kernels via `skopt.acquisition` on `n_cand` Sobol/LHS candidates. This cell computes `next_x_high_dist` (farthest candidate from observations) and uses it as fallback when the acquisition argmax lies in the masked set. Candidates within `MIN_DIST_THRESHOLD` of any observation are masked (EI/PI → −∞, LCB → +∞); when `BOUNDARY_MARGIN` > 0, candidates with any coordinate in [0, margin] or [1−margin, 1] are also masked (low-d only; F4–F8 use 0). If `BOUNDARY_MARGIN` is undefined (e.g. parameters cell not run), the cell sets it to 0. Ensemble logic (agree → EI argmax, disagree → centroid) or solo. Baselines: exploit + explore (no high-distance in F2–F8).
 6. **Select & illustrate** — Final plot: d=2: 1×2 (mean + std); d≥3: pairwise GP slices with acquisition markers; `tight_layout(rect=[0,0,1,0.96])` + `suptitle(..., y=0.98)` avoids title overlap.
-7. **Section 6: MyBO vs Open Source** — Compare this notebook’s next_x with Optuna, TuRBO, and GA (wrappers in `src/optimizers/wrappers/`). Observations and solver suggestions are plotted; the best observation is overlaid as a blue “+” on all panels.
+7. **Section 6: MyBO vs Open Source** — Compare this notebook’s next_x with Optuna, TuRBO, and DE-GP-EI (wrappers in `src/optimizers/wrappers/`; implementation `ga_solver`). Observations and solver suggestions are plotted; the best observation is overlaid as a blue “+” on all panels.
 8. **Export** — Append new observation and/or save next_x (cells after Section 6).
 
-**F1** retains the original full-options layout (all acquisition functions, high-distance baseline, Thompson/Entropy). F1 uses `MIN_DIST_THRESHOLD = 0.01` and replaces the proposed query with the high-distance fallback only for true duplicates (dist &lt; 1e-3), so proposals can refine near the best point. All F1 plot titles show `warping: {WARP_LABEL}`; IDW contour uses symlog only when warping is set. **F1 visualization:** Observation scatter colour scale is built from the **observation** y range (not the IDW grid); left-panel points have grey edges. **Section 6 (all notebooks):** MyBO vs **Optuna-TPE**, **Optuna-GP**, TuRBO, GA; F1 left = observations by y, right = IDW contour; F3–F8 use pairwise panels; best observation is a blue “+”; solver suggestions overlaid with name-keyed markers (`_SOLVER_STYLE`). All F3–F8 notebooks are fully adapted with dimension-specific pair counts, per-row colorbars, and optimised rendering.
+**F1** retains the original full-options layout (all acquisition functions, high-distance baseline, Thompson/Entropy). F1 uses `MIN_DIST_THRESHOLD = 0.01` and replaces the proposed query with the high-distance fallback only for true duplicates (dist &lt; 1e-3), so proposals can refine near the best point. All F1 plot titles show `warping: {WARP_LABEL}`; IDW contour uses symlog only when warping is set. **F1 visualization:** Observation scatter colour scale is built from the **observation** y range (not the IDW grid); left-panel points have grey edges. **Section 6 (all notebooks):** MyBO vs **Optuna-TPE**, **Optuna-GP**, TuRBO, DE-GP-EI; F1 left = observations by y, right = IDW contour; F3–F8 use pairwise panels; best observation is a blue “+”; solver suggestions overlaid with name-keyed markers (`_SOLVER_STYLE`). All F3–F8 notebooks are fully adapted with dimension-specific pair counts, per-row colorbars, and optimised rendering.
 
 For step-by-step adaptation checklists, see `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md`.
 
-**run_all.py** — Run from project root. Runs any `scripts/*.py` (e.g. append_week1..7_results.py), executes all 8 notebooks (generates submissions), then prints full portal strings for functions 1–8 and file paths. Use `--skip-notebooks` to skip notebook execution (show saved summary only); `--skip-scripts` to skip running scripts.
+**run_all.py** — Run from project root. Runs any `scripts/*.py` (sorted; includes `append_week*_results.py` after each portal round), executes all 8 notebooks if `nbconvert` is available (generates submissions), then prints full portal strings for functions 1–8 and file paths. Use `--skip-notebooks` to skip notebook execution (show saved summary only); `--skip-scripts` to skip running scripts.
 
 Write safety: `assert_not_under_initial_data(path, project_root)` only forbids writes under `project_root/initial_data/`; `data/results/`, `data/submissions/`, `data/problems/` are allowed.
 
