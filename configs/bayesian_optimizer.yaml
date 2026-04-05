@@ -1,4 +1,0 @@
-# MyBO (classical Bayesian optimization) hyperparameters per challenge function.
-# Keys match suggest() kwargs and notebook GP kernel params (constant_kernel_scale, etc.).
-# default is merged first; then function_1..function_8 override.
-# Used by my_gp_skopt.suggest() and the Function 1 notebook.

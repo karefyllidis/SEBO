@@ -11,8 +11,8 @@ black-box-optimization/
 │
 ├── src/
 │   ├── optimizers/
-│   │   ├── bayesian/             # acquisition_functions.py (UCB, EI, PI, Thompson, Entropy Search)
-│   │   └── wrappers/             # optuna_solver.py (TPE / GPSampler), turbo_solver.py, ga_solver.py (DE-GP-EI) — suggest(X,y,bounds) for §6
+│   │   ├── my_bayesian/          # acquisition_functions.py (UCB, EI, PI, Thompson, Entropy Search)
+│   │   └── wrappers/             # optuna_solver.py (TPE / GPSampler), turbo_solver.py, de_gp_ei_solver.py (DE-GP-EI) — suggest(X,y,bounds) for §6
 │   └── utils/
 │       ├── load_challenge_data.py # load_function_data(N), assert_not_under_initial_data (blocks writes under initial_data only)
 │       ├── plot_utilities.py     # style_axis, add_colorbar, style_legend, prepare_surface_for_plot, style_axis_3d; plot_2d_bo_state, plot_2d_function, plot_convergence, plot_gp_1d, plot_acquisition_1d, plot_bo_iteration_1d, plot_parallel_coordinates; DEFAULT_FONT_SIZE_*, DEFAULT_EXPORT_*
@@ -34,16 +34,12 @@ black-box-optimization/
 │   ├── function_7_Hyperparameter-Tuning.ipynb    # F7 (6D): §6 solver comparison, §7 append
 │   └── function_8_High-dimensional-ML-Model.ipynb # F8 (8D): §6 solver comparison, §7 append
 │
-├── run_all.py                   # Runs scripts + all 8 notebooks, prints portal strings; --skip-notebooks to skip execution
-├── scripts/                     # append_week{N}_results.py (portal feedback → observations.csv); run_optimizers_on_data.py
+├── run_pipeline.py                   # Runs append_results/*.py + all 8 notebooks, prints portal strings; --skip-notebooks / --skip-scripts
+├── append_results/               # append_week{N}_results.py (portal → observations.csv); run_optimizers_on_data.py (bench)
 ├── configs/
 │   ├── optuna_optimizer.yaml     # Per-function Optuna defaults (notebook §6 still passes explicit sampler/seed where needed)
 │   ├── turbo_optimizer.yaml, ga_optimizer.yaml, …  # Other wrappers
 │   └── problems/                 # (optional; see docs_private/private_notes.md)
-│
-├── tests/
-│   ├── test_optimizers/
-│   └── test_utils/
 │
 ├── docs/
 │   ├── project_roadmap.md        # (this file)
@@ -53,13 +49,17 @@ black-box-optimization/
 │
 ├── docs_private/                 # Private notes (gitignored; structure not listed in open repo)
 ├── requirements.txt
+├── requirements-benchmark.txt    # Optuna (bench / §6); optional hyperopt, botorch
 ├── .gitignore
 └── README.md
 ```
 
+**Configs:** Optional `configs/bayesian_optimizer.yaml` supplies per-function MyBO settings via `my_gp_skopt.load_mybo_config()`. If the file is absent, `suggest()` uses code defaults (see README).
+
 **Removed for now (add back when needed):**
 - `configs/algorithms/`, `configs/experiments/` — algorithm/experiment configs
-- Scripts in `scripts/` — `run_all.py` runs any `scripts/*.py` (e.g. `append_week1_results.py`, `append_week9_results.py`, … — one script per portal round); folder may be empty between milestones
+- **`append_results/`** — `run_pipeline.py` runs any `append_results/*.py` (append weeks + optional `run_optimizers_on_data.py`); folder may be empty between milestones
+- `src/optimizers/genetic/` — removed (was a dead stub); use `wrappers/de_gp_ei_solver.py` (DE-GP-EI) for differential evolution on GP-EI
 - `tests/test_objectives/` — we have no src/objective
 - `notebooks/weekly_review/` — weekly notes
 - `src/objective/`, `src/experiments/` — see private notes (e.g. in docs_private/)
@@ -72,35 +72,38 @@ black-box-optimization/
 4. **GP surrogate** — Fit 3 kernels (RBF, Matérn, RBF+WhiteKernel) with configurable bounds; select best by LML. 3×2 grid (mean + std). d≥3: 2D slices at median of held-out dimensions.
 5. **Acquisition** — EI/PI/UCB computed for all kernels via `skopt.acquisition` on `n_cand` Sobol/LHS candidates. This cell computes `next_x_high_dist` (farthest candidate from observations) and uses it as fallback when the acquisition argmax lies in the masked set. Candidates within `MIN_DIST_THRESHOLD` of any observation are masked (EI/PI → −∞, LCB → +∞); when `BOUNDARY_MARGIN` > 0, candidates with any coordinate in [0, margin] or [1−margin, 1] are also masked (low-d only; F4–F8 use 0). If `BOUNDARY_MARGIN` is undefined (e.g. parameters cell not run), the cell sets it to 0. Ensemble logic (agree → EI argmax, disagree → centroid) or solo. Baselines: exploit + explore (no high-distance in F2–F8).
 6. **Select & illustrate** — Final plot: d=2: 1×2 (mean + std); d≥3: pairwise GP slices with acquisition markers; `tight_layout(rect=[0,0,1,0.96])` + `suptitle(..., y=0.98)` avoids title overlap.
-7. **Section 6: MyBO vs Open Source** — Compare this notebook’s next_x with Optuna, TuRBO, and DE-GP-EI (wrappers in `src/optimizers/wrappers/`; implementation `ga_solver`). Observations and solver suggestions are plotted; the best observation is overlaid as a blue “+” on all panels.
+7. **Section 6: MyBO vs Open Source** — Compare this notebook’s next_x with Optuna, TuRBO, and DE-GP-EI (wrappers in `src/optimizers/wrappers/`; implementation `de_gp_ei_solver`). Observations and solver suggestions are plotted; the best observation is overlaid as a blue “+” on all panels.
 8. **Export** — Append new observation and/or save next_x (cells after Section 6).
 
 **F1** retains the original full-options layout (all acquisition functions, high-distance baseline, Thompson/Entropy). F1 uses `MIN_DIST_THRESHOLD = 0.01` and replaces the proposed query with the high-distance fallback only for true duplicates (dist &lt; 1e-3), so proposals can refine near the best point. All F1 plot titles show `warping: {WARP_LABEL}`; IDW contour uses symlog only when warping is set. **F1 visualization:** Observation scatter colour scale is built from the **observation** y range (not the IDW grid); left-panel points have grey edges. **Section 6 (all notebooks):** MyBO vs **Optuna-TPE**, **Optuna-GP**, TuRBO, DE-GP-EI; F1 left = observations by y, right = IDW contour; F3–F8 use pairwise panels; best observation is a blue “+”; solver suggestions overlaid with name-keyed markers (`_SOLVER_STYLE`). All F3–F8 notebooks are fully adapted with dimension-specific pair counts, per-row colorbars, and optimised rendering.
 
 For step-by-step adaptation checklists, see `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md`.
 
-**run_all.py** — Run from project root. Runs any `scripts/*.py` (sorted; includes `append_week*_results.py` after each portal round), executes all 8 notebooks if `nbconvert` is available (generates submissions), then prints full portal strings for functions 1–8 and file paths. Use `--skip-notebooks` to skip notebook execution (show saved summary only); `--skip-scripts` to skip running scripts.
+**run_pipeline.py** — Run from project root. Runs any `append_results/*.py` (sorted; includes `append_week*_results.py` after each portal round), executes all 8 notebooks when `nbconvert` and `ipykernel` are installed (see `requirements.txt`; generates submissions), then prints full portal strings for functions 1–8 and file paths. Use `--skip-notebooks` to skip notebook execution (show saved summary only); `--skip-scripts` to skip `append_results/*.py`.
 
 Write safety: `assert_not_under_initial_data(path, project_root)` only forbids writes under `project_root/initial_data/`; `data/results/`, `data/submissions/`, `data/problems/` are allowed.
 
 ## Planned components (add as you go)
 
-### `src/optimizers/bayesian/`
-- acquisition_functions.py (in use): UCB, EI, PI, Thompson Sampling, Entropy Search. Alternative to skopt; all notebooks (F1–F8) and function_0_devel use **skopt** (gaussian_ei, gaussian_pi, gaussian_lcb) for acquisition. Default next-query criterion configurable via `SOLO_STRATEGY`.
-- Add: GP surrogate, base_optimizer.py when you run BO in code.
+### `src/optimizers/my_bayesian/`
+
+- **`acquisition_functions.py`** — skopt alternative (EI, PI, UCB, …); **notebooks use skopt** for acquisition; used by `de_gp_ei_solver` for EI.
+- **`my_gp_skopt.py`** — MyBO `suggest()`; optional `configs/bayesian_optimizer.yaml`.
 
 ### `src/utils/`
-- load_challenge_data.py (in use). plot_utilities.py (in use): style_axis, add_colorbar, style_legend, prepare_surface_for_plot, style_axis_3d; plot_2d_bo_state, plot_2d_function, plot_convergence, plot_gp_1d, plot_acquisition_1d, plot_bo_iteration_1d, plot_parallel_coordinates; DEFAULT_FONT_SIZE_*, DEFAULT_EXPORT_*.
-- warping.py (in use): `apply_output_warping(y, mode=None|"log"|"boxcox")`, `inverse_output_warping` — HEBO-inspired output warping; all 8 notebooks use it when `OUTPUT_WARPING` is set; F1, F5, F7 default to `"log"`.
-- sampling_utils.py (in use by F1): `sample_candidates()` wrapper. F2/F3+ use `skopt.sampler.Sobol` / `Lhs` directly for space-filling candidate pools.
-- Add: logging.py, visualization.py, metrics.py as needed.
+
+- **`load_challenge_data.py`** — CSV / `initial_data` loads; write guard.
+- **`plot_utilities.py`**, **`warping.py`**, **`sampling_utils.py`** — plots, y-warping, F1 sampling helpers (see README / notebooks).
 
 ### `configs/problems/`
-- Removed for now (no code loaded it). Add problem YAMLs + loader later if we want a single source for dim, bounds, maximize; see docs_private/private_notes.md.
+
+- Optional YAML registry — no loader yet.
 
 ### `tests/`
-- test_optimizers/, test_utils/: add tests when you add code.
+
+- Not in repo; add when you automate checks.
 
 ### `docs/` and `docs_private/`
-- project_roadmap.md (this file), Capstone_Project_FAQs.md. Add learning_log.md, algorithms_summary.md as needed.
-- docs_private/: private notes, project log, TODO, guides; one notebook is tracked (gitignore exception). Contents gitignored; structure not listed in open repo.
+
+- **docs/** — roadmap, FAQs, foundations (see README table).
+- **docs_private/** — log, TODO, guides; whitelisted: `20_notebooks_for_devel/`, `unused_or_removable_inventory.md` (short cleanup bullets). Rest ignored.

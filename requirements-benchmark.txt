@@ -1,4 +1,11 @@
-# Optional: run external HPO solvers on your data (scripts/run_optimizers_on_data.py)
-# pip install -r requirements-benchmark.txt
-# For all solvers: pip install optuna HEBO hyperopt botorch "ray[tune]"
-optuna>=3.0
+# Optional: external HPO solvers (append_results/run_optimizers_on_data.py, notebook §6).
+# Install on top of requirements.txt:
+#   pip install -r requirements.txt -r requirements-benchmark.txt
+#
+# Optuna: TPE default; GPSampler (apples-to-apples GP vs MyBO) needs Optuna >= 3.6 (see optuna_solver.py).
+optuna>=3.6
+
+# Optional extras for --solvers hyperopt / turbo (same script):
+#   pip install hyperopt
+#   pip install botorch
+# (BoTorch pulls PyTorch and GPyTorch; versions depend on your platform.)

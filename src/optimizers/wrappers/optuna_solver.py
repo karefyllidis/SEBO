@@ -30,7 +30,7 @@ From project root:
     # Per-function hyperparameters from configs/optuna_optimizer.yaml:
     x_next = optuna_suggest(X, y, bounds=bounds, function_id=1)
 
-Used by scripts/run_optimizers_on_data.py and by the Function 1 notebook
+Used by append_results/run_optimizers_on_data.py and by the Function 1 notebook
 (Section 6: MyBO vs Optuna comparison).
 """
 

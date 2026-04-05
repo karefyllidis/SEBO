@@ -1,6 +1,6 @@
 # Optuna (TPE / CMA-ES / random) hyperparameters per challenge function.
 # Keys match suggest() kwargs. default is merged first; then function_1..function_8 override.
-# Used by optuna_solver.suggest(), the Function 1 notebook (Section 6), and scripts/run_optimizers_on_data.py.
+# Used by optuna_solver.suggest(), the Function 1 notebook (Section 6), and append_results/run_optimizers_on_data.py.
 
 default:
   sampler: "tpe"
