@@ -1,7 +1,7 @@
-# TuRBO (BoTorch) hyperparameters per challenge function.
-# Keys match suggest() kwargs. default is merged first; then function_1..function_8 override.
-# acqf: "ts" (Thompson sampling) or "ei" (Expected Improvement).
-# Used by turbo_solver.suggest() and the Function 1 notebook (Section 6).
+# TuRBO-1 (BoTorch trust-region BO): hyperparameters per challenge function.
+# Optional: pip install botorch (pulls PyTorch + GPyTorch). Notebooks skip TuRBO if BoTorch is missing.
+# Keys match suggest() kwargs; default first; function_1..function_8 override. acqf: "ts" | "ei".
+# Used by turbo_solver.suggest(), notebooks Section 6, and append_results/run_optimizers_on_data.py (--solvers turbo).
 
 default:
   acqf: "ts"

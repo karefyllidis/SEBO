@@ -45,12 +45,12 @@ def load_de_gp_ei_config(
     function_id: int | None = None,
     project_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Load DE-GP-EI hyperparameters from configs/ga_optimizer.yaml."""
+    """Load DE-GP-EI hyperparameters from configs/de_gp_ei_optimizer.yaml."""
     if not _YAML_AVAILABLE:
         return {}
     if config_path is None:
         project_root = project_root or Path(__file__).resolve().parent.parent.parent.parent
-        config_path = Path(project_root) / "configs" / "ga_optimizer.yaml"
+        config_path = Path(project_root) / "configs" / "de_gp_ei_optimizer.yaml"
     path = Path(config_path)
     if not path.exists():
         return {}

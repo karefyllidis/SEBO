@@ -1,4 +1,4 @@
-# Optional: external HPO solvers (append_results/run_optimizers_on_data.py, notebook §6).
+# Optional: external HPO solvers (append_results/run_optimizers_on_data.py, notebook Section 6).
 # Install on top of requirements.txt:
 #   pip install -r requirements.txt -r requirements-benchmark.txt
 #

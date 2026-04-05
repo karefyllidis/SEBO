@@ -1,12 +1,14 @@
-# Optuna (TPE / CMA-ES / random) hyperparameters per challenge function.
-# Keys match suggest() kwargs. default is merged first; then function_1..function_8 override.
-# Used by optuna_solver.suggest(), the Function 1 notebook (Section 6), and append_results/run_optimizers_on_data.py.
+# Optuna hyperparameters per challenge function (TPE, CMA-ES, random, GP sampler).
+# Keys match suggest() kwargs. default is merged first; function_1..function_8 override.
+# Explicit arguments to optuna_solver.suggest() (e.g. sampler="gp", seed) override this file — use that in Section 6 for side-by-side TPE vs GP.
+# GPSampler needs Optuna >= 3.6 (see requirements-benchmark.txt). TPE uses multivariate mode in code.
+# Used by optuna_solver.suggest(), all function notebooks (Section 6), and append_results/run_optimizers_on_data.py.
 
 default:
   sampler: "tpe"
   n_startup_trials: 10
   seed: 42
-  # TPE-only (ignored for cmaes/random): number of candidate samples to compute EI
+  # TPE-only (ignored for cmaes/random/gp): number of candidate samples to compute EI
   n_ei_candidates: 24
 
 # Function 1: 2D Radiation — small budget; fewer startup trials

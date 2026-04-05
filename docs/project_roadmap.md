@@ -12,7 +12,7 @@ black-box-optimization/
 ├── src/
 │   ├── optimizers/
 │   │   ├── my_bayesian/          # acquisition_functions.py (UCB, EI, PI, Thompson, Entropy Search)
-│   │   └── wrappers/             # optuna_solver.py (TPE / GPSampler), turbo_solver.py, de_gp_ei_solver.py (DE-GP-EI) — suggest(X,y,bounds) for §6
+│   │   └── wrappers/             # optuna_solver.py (TPE / GPSampler), turbo_solver.py, de_gp_ei_solver.py (DE-GP-EI) — suggest(X,y,bounds) for Section 6
 │   └── utils/
 │       ├── load_challenge_data.py # load_function_data(N), assert_not_under_initial_data (blocks writes under initial_data only)
 │       ├── plot_utilities.py     # style_axis, add_colorbar, style_legend, prepare_surface_for_plot, style_axis_3d; plot_2d_bo_state, plot_2d_function, plot_convergence, plot_gp_1d, plot_acquisition_1d, plot_bo_iteration_1d, plot_parallel_coordinates; DEFAULT_FONT_SIZE_*, DEFAULT_EXPORT_*
@@ -25,20 +25,22 @@ black-box-optimization/
 │   (data/results/)               # Exported plots (observations+contour, 3D surface, GP kernels, all acquisition points)
 │
 ├── notebooks/
-│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options; §6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / DE-GP-EI, best obs blue "+"
-│   ├── function_2_Mystery-ML-Model.ipynb         # F2 (2D): d=2 template — 3 kernels, ensemble; §6 solver comparison
-│   ├── function_3_Drug-Discovery.ipynb           # F3 (3D): pairwise projections, GP slices; §6 solver comparison
-│   ├── function_4_Warehouse-Logistics.ipynb      # F4 (4D): 6 pairwise plots; §6 solver comparison, §7 append feedback
+│   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options; Section 6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / DE-GP-EI, best obs blue "+"
+│   ├── function_2_Mystery-ML-Model.ipynb         # F2 (2D): d=2 template — 3 kernels, ensemble; Section 6 solver comparison
+│   ├── function_3_Drug-Discovery.ipynb           # F3 (3D): pairwise projections, GP slices; Section 6 solver comparison
+│   ├── function_4_Warehouse-Logistics.ipynb      # F4 (4D): 6 pairwise plots; Section 6 solver comparison, Section 7 append feedback
 │   ├── function_5_Chemical-Process-Yield.ipynb   # F5 (4D): same as F4
-│   ├── function_6_Recipe-Optimization.ipynb      # F6 (5D): §6 solver comparison, §7 append
-│   ├── function_7_Hyperparameter-Tuning.ipynb    # F7 (6D): §6 solver comparison, §7 append
-│   └── function_8_High-dimensional-ML-Model.ipynb # F8 (8D): §6 solver comparison, §7 append
+│   ├── function_6_Recipe-Optimization.ipynb      # F6 (5D): Section 6 solver comparison, Section 7 append
+│   ├── function_7_Hyperparameter-Tuning.ipynb    # F7 (6D): Section 6 solver comparison, Section 7 append
+│   └── function_8_High-dimensional-ML-Model.ipynb # F8 (8D): Section 6 solver comparison, Section 7 append
 │
 ├── run_pipeline.py                   # Runs append_results/*.py + all 8 notebooks, prints portal strings; --skip-notebooks / --skip-scripts
 ├── append_results/               # append_week{N}_results.py (portal → observations.csv); run_optimizers_on_data.py (bench)
 ├── configs/
-│   ├── optuna_optimizer.yaml     # Per-function Optuna defaults (notebook §6 still passes explicit sampler/seed where needed)
-│   ├── turbo_optimizer.yaml, ga_optimizer.yaml, …  # Other wrappers
+│   ├── optuna_optimizer.yaml     # Per-function Optuna defaults (notebook Section 6 may pass explicit sampler/seed)
+│   ├── de_gp_ei_optimizer.yaml   # DE-GP-EI (scipy DE on GP-EI)
+│   ├── hyperopt_optimizer.yaml   # Hyperopt TPE
+│   ├── turbo_optimizer.yaml      # TuRBO (BoTorch)
 │   └── problems/                 # (optional; see docs_private/private_notes.md)
 │
 ├── docs/
@@ -49,7 +51,7 @@ black-box-optimization/
 │
 ├── docs_private/                 # Private notes (gitignored; structure not listed in open repo)
 ├── requirements.txt
-├── requirements-benchmark.txt    # Optuna (bench / §6); optional hyperopt, botorch
+├── requirements-benchmark.txt    # Optuna (bench / notebook Section 6); optional hyperopt, botorch
 ├── .gitignore
 └── README.md
 ```
@@ -58,7 +60,6 @@ black-box-optimization/
 
 **Removed for now (add back when needed):**
 - `configs/algorithms/`, `configs/experiments/` — algorithm/experiment configs
-- **`append_results/`** — `run_pipeline.py` runs any `append_results/*.py` (append weeks + optional `run_optimizers_on_data.py`); folder may be empty between milestones
 - `src/optimizers/genetic/` — removed (was a dead stub); use `wrappers/de_gp_ei_solver.py` (DE-GP-EI) for differential evolution on GP-EI
 - `tests/test_objectives/` — we have no src/objective
 - `notebooks/weekly_review/` — weekly notes
@@ -77,7 +78,7 @@ black-box-optimization/
 
 **F1** retains the original full-options layout (all acquisition functions, high-distance baseline, Thompson/Entropy). F1 uses `MIN_DIST_THRESHOLD = 0.01` and replaces the proposed query with the high-distance fallback only for true duplicates (dist &lt; 1e-3), so proposals can refine near the best point. All F1 plot titles show `warping: {WARP_LABEL}`; IDW contour uses symlog only when warping is set. **F1 visualization:** Observation scatter colour scale is built from the **observation** y range (not the IDW grid); left-panel points have grey edges. **Section 6 (all notebooks):** MyBO vs **Optuna-TPE**, **Optuna-GP**, TuRBO, DE-GP-EI; F1 left = observations by y, right = IDW contour; F3–F8 use pairwise panels; best observation is a blue “+”; solver suggestions overlaid with name-keyed markers (`_SOLVER_STYLE`). All F3–F8 notebooks are fully adapted with dimension-specific pair counts, per-row colorbars, and optimised rendering.
 
-For step-by-step adaptation checklists, see `docs_private/40_notes_and_references/function_notebook_adaptation_guide.md`.
+Notebook workflow above is the canonical adaptation checklist (F2 / F4 templates); see also `docs_private/40_notes_and_references/README.md`.
 
 **run_pipeline.py** — Run from project root. Runs any `append_results/*.py` (sorted; includes `append_week*_results.py` after each portal round), executes all 8 notebooks when `nbconvert` and `ipykernel` are installed (see `requirements.txt`; generates submissions), then prints full portal strings for functions 1–8 and file paths. Use `--skip-notebooks` to skip notebook execution (show saved summary only); `--skip-scripts` to skip `append_results/*.py`.
 

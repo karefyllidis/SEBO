@@ -1,6 +1,6 @@
 # Technical foundations
 
-Short reference for the main justification, key literature, and library choices behind this BBO capstone. See README §4 (Technical approach) and References for full detail.
+Short reference for the main justification, key literature, and library choices behind this BBO capstone. See README Section 4 (Technical approach) and References for full detail.
 
 ---
 
@@ -32,16 +32,16 @@ Short reference for the main justification, key literature, and library choices 
 | **scikit-learn** (`GaussianProcessRegressor`) | Core GP surrogate (fit, predict mean and std) | Stable API, built-in LML-based kernel optimisation, good behaviour for small n. **GPyTorch** would scale better to large n but adds complexity and is unnecessary for our evaluation budget. |
 | **scikit-optimize (skopt)** (`gaussian_ei`, `gaussian_pi`, `gaussian_lcb`; `Sobol`, `Lhs`) | Compute EI/PI/UCB over a candidate set; generate space-filling candidates | Widely used in BO tutorials and NeurIPS 2020 starter kit; Sobol gives low-discrepancy coverage. We also implement EI/UCB/PI in `src/optimizers/my_bayesian/` for transparency; notebooks use skopt for consistency. |
 | **NumPy, SciPy, Matplotlib** | Numerical computation and visualisation | Standard, stable stack. **PyTorch/TensorFlow** not chosen: surrogate is a GP, not a neural network; for our data size, a GP is more data-efficient and provides uncertainty without extra machinery. |
-| **SciPy** (`scipy.optimize.differential_evolution`) | **DE-GP-EI** (`de_gp_ei_solver.py`): maximise GP Expected Improvement continuously on \([0,1]^d\) | Same BO idea as the notebooks (fit GP → optimise acquisition); DE is only applied to the **surrogate** acquisition, not a genetic algorithm on the black-box \(f\). User-facing name **DE-GP-EI**; CLI `de_gp_ei` / `ga` in `run_optimizers_on_data.py`. |
+| **SciPy** (`scipy.optimize.differential_evolution`) | **DE-GP-EI** (`de_gp_ei_solver.py`): maximise GP Expected Improvement continuously on \([0,1]^d\) | Same BO idea as the notebooks (fit GP → optimise acquisition); DE is only applied to the **surrogate** acquisition, not a genetic algorithm on the black-box \(f\). User-facing name **DE-GP-EI**; CLI `de_gp_ei` / `ga` in `run_optimizers_on_data.py`. Per-function defaults: `configs/de_gp_ei_optimizer.yaml`. |
 
 ---
 
 ## Where this is documented in the repo
 
 - **README.md** — overview, structure, workflow, references.
-- **docs/project_roadmap.md** — layout, §6 solvers, `run_pipeline.py`.
+- **docs/project_roadmap.md** — layout, Section 6 solvers, `run_pipeline.py`, optimizer YAML under `configs/`.
 - **docs/Capstone_Project_FAQs.md** — capstone-specific Q&A.
-- **Notebooks** — per-function params and §6 comparison plots.
+- **Notebooks** — per-function params and Section 6 comparison plots.
 - **submission-template/** — portfolio sheet / model card.
 - **docs_private/** — private notes; **`unused_or_removable_inventory.md`** = short cleanup checklist.
 
