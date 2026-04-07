@@ -6,6 +6,15 @@ TuRBO (Trust Region Bayesian Optimization) excels at high-dimensional problems
 
 Uses BoTorch TuRBO-1 implementation. Same interface: suggest(X, y, bounds) -> x_next.
 
+One-shot vs full TuRBO
+----------------------
+Each call fits a GP, builds a trust region around the **current** best training point,
+and returns one candidate. Full TuRBO-1 in the literature **persists** trust-region
+state (expand/shrink ``length``) across iterations; this wrapper **does not** carry
+state between calls. Use it for ``(X, y) -> x_next`` snapshots; for long runs,
+either call it inside your own loop and optionally adapt the TR size externally,
+or use a multi-step BoTorch TuRBO pipeline.
+
 Dependency
 ----------
 Requires BoTorch (and PyTorch, GPyTorch): pip install botorch

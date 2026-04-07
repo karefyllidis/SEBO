@@ -72,13 +72,19 @@ We optimize **8 unknown** objective functions with a limited number of expensive
 - **Round 1:** Exploration-heavy; ~10 points, high uncertainty. EI/UCB over Sobol/LHS candidates. Default: EI (sometimes UCB with higher κ).
 - **Round 2:** Same method; 11 points after Week 1. Posterior improved; suggestion changed without changing the algorithm. Exploration bonus unchanged (5D–8D still uncertain).
 - **Round 3:** ~12–14 points. More trust in EI over fixed candidates; heuristics (Sobol/grid), default RBF, no GP tuning. EI single criterion; GP uncertainty drives exploration.
-- **Rounds 4–6:** Per-function tuning; kernel choice by LML (RBF, Matérn, RBF+WhiteKernel); ensemble acquisition (EI+PI+UCB) or solo EI; ARD length scales used to interpret dimension importance (e.g. F8). Progressive refinement: early rounds coarse (which regions have signal), later rounds narrow around promising basins. Duplicate avoidance (MIN_DIST_THRESHOLD) and boundary masking (F1–F3 only) throughout. See `docs_private/canvas_submissions_archive/` for module-by-module reflections.
+- **Rounds 4–6:** Per-function tuning; kernel choice by LML (RBF, Matérn, RBF+WhiteKernel); ensemble acquisition (EI+PI+UCB) or solo EI; ARD length scales used to interpret dimension importance (e.g. F8). Progressive refinement: early rounds coarse (which regions have signal), later rounds narrow around promising basins. Duplicate avoidance (MIN_DIST_THRESHOLD) and boundary masking (F1–F3 only) throughout. See `docs_private/10_canvas_submissions_archive/` for module-by-module reflections.
 
 ### Exploration–exploitation
 
 **Trade-off:** Exploration (under-sampled/uncertain regions) vs exploitation (near known good values). **EI** balances them: high where μ(x) > current best (exploit) or σ(x) large (explore). No round-by-round κ tuning. Alternatives: UCB (μ + κσ), PI, Thompson Sampling, high-distance baseline; per-function and documented in notebooks.
 
 **Thoughtful aspects:** Documented kernel/acquisition/default in each notebook; fixed seeds and flags for reproducibility; section and notebooks updated each round.
+
+### Space-filling warm-up vs. late budget
+
+When you **control the first queries** (beyond fixed challenge `initial_data`), a short **space-filling** phase—**LHS**, **Sobol**, or a small stratified grid for the first **k** evaluations (e.g. **k ≈ 2d–5d**)—often gives the surrogate better **global** coverage before acquisition takes over. That payoff is largest **at the start** of a run; past queries cannot be reclaimed.
+
+If only **a few submissions remain**, refitting the whole pipeline around a formal warm-up is usually **not** worth the time: lean on strong BO/EI (and your plots). **Optional:** one **deliberately wide** query if points are **clustered** and important areas are still empty. Further ideas (multi-seed baselines, fair wrapper comparison, stateful TuRBO) live under **Future work and later considerations** in **`docs/project_roadmap.md`**.
 
 ---
 
@@ -128,7 +134,7 @@ black-box-optimization/
 ├── data/
 │   ├── problems/                  # Appended data: only observations.csv (no .npy under data/; initial_data/ is read-only .npy)
 │   └── submissions/               # Next input to submit (function_1/next_input.npy, next_input_portal.txt)
-├── data/results/                  # Exported plots (when IF_EXPORT_PLOT = True; see Write safety below)
+├── data/results/                  # Exported plots per function: function_1/ … function_8/ (when IF_EXPORT_PLOT = True)
 │
 ├── notebooks/
 │   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options — 3 GP kernels, all acquisitions, baselines; Section 6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / DE-GP-EI; best obs as blue "+" on both panels
@@ -164,7 +170,7 @@ black-box-optimization/
 
 **MyBO config:** You can add optional `configs/bayesian_optimizer.yaml` with `default` and per-function sections (`function_1`…`function_8`); if the file is absent, `my_gp_skopt.load_mybo_config` returns an empty dict and `suggest()` uses code defaults.
 
-**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Section 6** in every notebook is **MyBO vs Open Source**: comparison of this notebook’s `next_x` (MyBO) with **Optuna-TPE**, **Optuna-GP** (Optuna’s `GPSampler`, GP-style acquisition), **TuRBO**, and **DE-GP-EI** (scipy `differential_evolution` on GP Expected Improvement; notebooks label this solver **DE-GP-EI**; implementation module `de_gp_ei_solver`); observations and solver suggestions are overlaid, with the **best observation** marked by a blue “+” on all panels. After Section 6, set **`NEXT_QUERY_SOLUTION`** (`'MyBO'` \| `'Optuna-TPE'` \| `'Optuna-GP'` \| `'TuRBO'` \| `'DE-GP-EI'`) in a dedicated cell so the **save** step writes that solver’s vector to `data/submissions/function_N/` (run Section 6 first if you export anything other than MyBO). The legacy value `'GA'` is still accepted and maps to **DE-GP-EI**. **`IF_EXPORT_PLOT`** defaults to **False** in notebooks (set True to write figures under `data/results/`). **Function 1** keeps the original full-options layout; its observation scatter uses a colour scale from the **observation** y range (not the IDW grid), with grey edges; Section 6 has left panel = observations by y + best “+”, right = IDW contour + best “+”. F3–F8 use coarser visualisation grids (`n_grid_viz`) and finer Sobol candidate sets (`n_cand`, power of 2). d≥3 notebooks use 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (under `docs_private/20_notebooks_for_devel/`) is a 1D tutorial when present. For adaptation checklists, see **`docs/project_roadmap.md`** (Notebook workflow) and **`docs_private/40_notes_and_references/README.md`**.
+**Notebooks:** One notebook per function (1–8), all fully adapted and operational. **Function 2** is the canonical d=2 template; **Function 4** is the d≥3 template (extended from F3). All notebooks use three GP kernels (RBF, Matérn, RBF+WhiteKernel) with automatic best-kernel selection (LML), configurable kernel bounds, and ensemble/solo acquisition modes. **Section 6** in every notebook is **MyBO vs Open Source**: comparison of this notebook’s `next_x` (MyBO) with **Optuna-TPE**, **Optuna-GP** (Optuna’s `GPSampler`, GP-style acquisition), **TuRBO**, and **DE-GP-EI** (scipy `differential_evolution` on GP Expected Improvement; notebooks label this solver **DE-GP-EI**; implementation module `de_gp_ei_solver`); observations and solver suggestions are overlaid, with the **best observation** marked by a blue “+” on all panels. After Section 6, set **`NEXT_QUERY_SOLUTION`** (`'MyBO'` \| `'Optuna-TPE'` \| `'Optuna-GP'` \| `'TuRBO'` \| `'DE-GP-EI'`) in a dedicated cell so the **save** step writes that solver’s vector to `data/submissions/function_N/` (run Section 6 first if you export anything other than MyBO). The legacy value `'GA'` is still accepted and maps to **DE-GP-EI**. **`IF_EXPORT_PLOT`** defaults to **False** in notebooks (set True to write figures under `data/results/function_N/`). **Function 1** keeps the original full-options layout; its observation scatter uses a colour scale from the **observation** y range (not the IDW grid), with grey edges; Section 6 has left panel = observations by y + best “+”, right = IDW contour + best “+”. F3–F8 use coarser visualisation grids (`n_grid_viz`) and finer Sobol candidate sets (`n_cand`, power of 2). d≥3 notebooks use 2D pairwise projections with per-row colorbars and GP slices at median of held-out dimensions. **function_0_devel** (under `docs_private/20_notebooks_for_devel/`) is a 1D tutorial when present. For adaptation checklists, see **`docs/project_roadmap.md`** (Notebook workflow) and **`docs_private/40_notes_and_references/README.md`**.
 
 Further details on planned components are in `docs/project_roadmap.md`.
 
@@ -230,14 +236,14 @@ You are not required to build a submission optimizer from scratch or to find the
 |------|---------|
 | **README.md** (this file) | Project overview, inputs/outputs, technical approach, structure, getting started |
 | **docs/README.md** | Index of tracked docs (this table in compact form) |
-| **docs/project_roadmap.md** | Current structure, notebook workflow, planned components, run_pipeline.py usage |
+| **docs/project_roadmap.md** | Current structure, notebook workflow, planned components, future work / later considerations, `run_pipeline.py` usage |
 | **docs/Capstone_Project_FAQs.md** | Capstone FAQs: data, submission, method, acquisition and `append_results` |
 | **docs/TECHNICAL_FOUNDATIONS.md** | Technical justification, key papers (Rasmussen & Williams, Jones et al., NeurIPS 2020 BBO), library choices and alternatives |
 | **docs_private/40_notes_and_references/00_bayesian_methods/ensemble_acquisition_guide.md** | Ensemble EI+PI+UCB: agree/disagree logic, skopt usage |
 | **docs_private/project_log.md** | Weekly evolution, assumptions, results, reflections, peer ideas |
 | **docs_private/TODO.md** | Near-term tasks and status |
-| **docs_private/canvas_submissions_archive/canvas_submissions_all.md** | Archive of submitted reflections (Modules 12–17) |
-| **docs_private/similar_projects/** | Notes from BBO starter kit; HEBO and other references for optional follow-up |
+| **docs_private/10_canvas_submissions_archive/canvas_submissions_all.md** | Archive of submitted reflections (Modules 12–17) |
+| **docs_private/30_similar_projects/** | Notes from BBO starter kit; HEBO and other references for optional follow-up |
 | **docs_private/20_notebooks_for_devel/** | Development notebooks (e.g. `function_0_devel.ipynb` — 1D tutorial, GP kernels, skopt, ensemble) |
 | **docs_private/unused_or_removable_inventory.md** | Bullet checklist: optional cleanups, what was already removed, bench-only code — short |
 
@@ -248,6 +254,6 @@ You are not required to build a submission optimizer from scratch or to find the
 ## References
 
 - **NeurIPS 2020 BBO Challenge:** [Official starter kit](https://github.com/rdturnermtl/bbo_challenge_starter_kit) (suggest–observe API, Bayesmark, example submissions: skopt, hyperopt, nevergrad, turbo, etc.). Leaderboard used minimization over hidden ML tuning tasks; our capstone uses the same BO ideas (GP surrogate + acquisition) with a **maximization**, notebook-based, one-query-per-week workflow and fixed [0,1]^d domains.
-- NeurIPS 2020 BBO Challenge (Huawei/Noah's Ark: HEBO — GPs + heteroscedasticity/non-stationarity; Nvidia: ensembles; JetBrains: GP + SVM + nearest neighbour). See `docs/TECHNICAL_FOUNDATIONS.md` and `docs_private/similar_projects/` for notes.
+- NeurIPS 2020 BBO Challenge (Huawei/Noah's Ark: HEBO — GPs + heteroscedasticity/non-stationarity; Nvidia: ensembles; JetBrains: GP + SVM + nearest neighbour). See `docs/TECHNICAL_FOUNDATIONS.md` and `docs_private/30_similar_projects/` for notes.
 - Sample repos: [Bayesian Optimisation (soham96)](https://github.com/soham96/hyperparameter_optimisation), [Bayesian Optimization with XGBoost (solegalli)](https://github.com/solegalli/hyperparameter-optimization), [Bayesian Hyperparameter Optimization of GBM (WillKoehrsen)](https://github.com/WillKoehrsen/hyperparameter-optimization).
 - Capstone Project FAQs: `docs/Capstone_Project_FAQs.md`.

@@ -23,9 +23,83 @@ from matplotlib.cm import ScalarMappable
 # Font sizes: axis labels, colorbar labels/ticks, legend vs subplot/figure titles
 DEFAULT_FONT_SIZE_AXIS = 8
 DEFAULT_FONT_SIZE_TITLES = 10
-# Export: resolution and format when saving figures (directory is set by caller, e.g. repo_root / "data" / "results")
+# Export: resolution and format when saving figures (directory is set by caller, e.g. repo_root / "data" / "results" / "function_N")
 DEFAULT_EXPORT_DPI = 150
 DEFAULT_EXPORT_FORMAT = "png"
+
+
+def setup_matplotlib(ax: Axes | np.ndarray | None = None) -> None:
+    """
+    Apply publication-style matplotlib defaults globally, and optionally per-axis
+    (ticks, minor ticks, grid). Pass a single Axes or the ndarray returned by subplots.
+    """
+    plt.rcParams.update(
+        {
+            "figure.figsize": (24, 6),
+            "figure.dpi": 120,
+            "savefig.dpi": 200,
+            "savefig.bbox": "tight",
+            "savefig.pad_inches": 0.02,
+            # Body text 10 pt, figure suptitle 11 pt (matches function_1 summary panels).
+            "font.size": 10,
+            "axes.labelsize": 10,
+            "axes.titlesize": 10,
+            "figure.titlesize": 11,
+            "legend.fontsize": 10,
+            "xtick.labelsize": 10,
+            "ytick.labelsize": 10,
+            "lines.linewidth": 1.2,
+            "lines.markersize": 4,
+            "axes.linewidth": 0.8,
+            "axes.spines.top": True,
+            "axes.spines.right": True,
+            "text.color": "black",
+            "axes.labelcolor": "black",
+            "xtick.color": "black",
+            "ytick.color": "black",
+            "xtick.direction": "in",
+            "ytick.direction": "in",
+            # Without these, Matplotlib uses no minor locators (only sizes above apply if enabled).
+            "xtick.minor.visible": True,
+            "ytick.minor.visible": True,
+            # Mirror ticks on top/right (labels stay on bottom/left by default).
+            "xtick.top": True,
+            "xtick.minor.top": True,
+            "ytick.right": True,
+            "ytick.minor.right": True,
+            "xtick.major.size": 6,
+            "ytick.major.size": 6,
+            "xtick.minor.size": 4,
+            "ytick.minor.size": 4,
+            "xtick.major.width": 0.8,
+            "ytick.major.width": 0.8,
+            "xtick.minor.width": 0.5,
+            "ytick.minor.width": 0.5,
+            "xtick.major.pad": 6,
+            "ytick.major.pad": 6,
+            "xtick.minor.pad": 4,
+            "ytick.minor.pad": 4,
+            "legend.frameon": False,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "text.usetex": False,
+        }
+    )
+    if ax is not None:
+        axes_list = list(ax.flat) if hasattr(ax, "flat") else [ax]
+        for a in axes_list:
+            a.set_axisbelow(True)
+            a.grid(True, linestyle="--", linewidth=0.65, color="gray", alpha=0.75)
+            a.tick_params(
+                axis="both",
+                which="both",
+                direction="in",
+                top=True,
+                bottom=True,
+                left=True,
+                right=True,
+            )
+            a.minorticks_on()
 
 
 def add_colorbar(

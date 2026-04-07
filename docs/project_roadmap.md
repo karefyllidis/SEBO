@@ -22,7 +22,7 @@ black-box-optimization/
 ├── data/
 │   ├── problems/                 # Local appended data: only observations.csv per function (no .npy under data/)
 │   ├── submissions/              # Next input to submit (function_1/next_input.npy, next_input_portal.txt)
-│   (data/results/)               # Exported plots (observations+contour, 3D surface, GP kernels, all acquisition points)
+│   (data/results/function_N/)    # Exported plots per function (observations+contour, 3D surface, GP kernels, Section 6, …)
 │
 ├── notebooks/
 │   ├── function_1_Radiation-Detection.ipynb      # F1 (2D): full options; Section 6 MyBO vs Optuna-TPE / Optuna-GP / TuRBO / DE-GP-EI, best obs blue "+"
@@ -108,3 +108,14 @@ Write safety: `assert_not_under_initial_data(path, project_root)` only forbids w
 
 - **docs/** — roadmap, FAQs, foundations (see README table).
 - **docs_private/** — log, TODO, guides; whitelisted: `20_notebooks_for_devel/`, `unused_or_removable_inventory.md` (short cleanup bullets). Rest ignored.
+
+## Future work and later considerations
+
+Ideas that are not required for the current capstone runs but worth revisiting if budget, time, or evaluation rigor increases.
+
+- **Space-filling warm-up:** When you control the first queries (beyond fixed challenge `initial_data`), spend the first **k** evaluations on **LHS**, **Sobol**, or a small **stratified grid** (e.g. k ≈ 2d–5d or a fixed k like 5 in 2D) before leaning on BO/TPE. Improves global coverage when **n** is small and the surrogate is sensitive to early geometry.
+- **Stronger baseline evaluation:** Average **multi-seed** suggestions or **best-so-far vs evaluation index** curves for Section 6 methods (`append_results/run_optimizers_on_data.py --seeds …`); single-seed snapshots are high-variance.
+- **Fairer wrapper vs notebook BO:** Optionally **restrict** or **snap** continuous acquisition optimizers to the same **Sobol/LHS candidate set** (or grid) the notebook uses, so comparisons isolate the surrogate rule rather than the search space parameterization.
+- **TuRBO beyond one-shot `suggest()`:** A **persistent** trust-region state (expand/shrink length) over a self-managed loop matches the usual TuRBO-1 narrative; the current wrapper is intentionally stateless per call.
+- **Shared Section 6 code:** Function 1 imports `src.utils.compare_solvers`; other notebooks still duplicate the Section 6 helper block—could migrate them to the same helper when convenient.
+- **Batch vs notebook warping:** If you add or change `OUTPUT_WARPING` on more functions, extend `src.utils.compare_solvers._OUTPUT_WARPING_BY_FUNCTION_ID` so CLI benchmarks stay aligned.
