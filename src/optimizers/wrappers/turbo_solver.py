@@ -43,7 +43,7 @@ try:
     from gpytorch.likelihoods import GaussianLikelihood
     from gpytorch.mlls import ExactMarginalLogLikelihood
     from torch.quasirandom import SobolEngine
-    from botorch.acquisition import qExpectedImprovement
+    from botorch.acquisition import qLogExpectedImprovement
     from botorch.fit import fit_gpytorch_mll
     from botorch.generation import MaxPosteriorSampling
     from botorch.models import SingleTaskGP
@@ -214,7 +214,7 @@ def suggest(
         with torch.no_grad():
             X_next = thompson_sampling(X_cand, num_samples=1)
     else:
-        ei = qExpectedImprovement(model, train_Y.max())
+        ei = qLogExpectedImprovement(model, train_Y.max())
         X_next, _ = optimize_acqf(
             ei,
             bounds=torch.stack([tr_lb, tr_ub]),
