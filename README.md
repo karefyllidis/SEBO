@@ -1,6 +1,6 @@
 # Black-Box Optimisation with Bayesian Optimisation
-### NeurIPS 2020 Black-Box Optimisation Competition — ICL PCMLAI Capstone
 
+**NeurIPS 2020 Black-Box Optimisation Competition — ICL PCMLAI Capstone**  
 **Author:** [Nikolas Karefyllidis, PhD](https://www.linkedin.com/in/karefyllidis/)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
@@ -9,9 +9,25 @@
 ![Rounds](https://img.shields.io/badge/Rounds-10-orange)
 ![Functions](https://img.shields.io/badge/Functions-8-purple)
 
-This project follows the format of the **[NeurIPS 2020 Black-Box Optimisation Challenge](https://github.com/rdturnermtl/bbo_challenge_starter_kit)**: sequential optimisation of 8 unknown objective functions under a strict per-round evaluation budget, using the same suggest–observe API and Bayesmark evaluation framework as the competition. One query per function per week across 10 rounds.
+## At a glance
 
-**Bayesian Optimisation (BO)** was chosen as the core strategy because it is specifically designed for exactly this setting — expensive black-box objectives with no access to gradients or closed-form expressions, where every evaluation counts. BO builds a probabilistic surrogate (GP) over the unknown function and uses it to decide where to query next, trading off exploration of uncertain regions against exploitation of known good ones. This makes it far more sample-efficient than random search or grid search, which is critical when the evaluation budget is as small as 10–20 points per function. The pipeline features automatic kernel selection via log-marginal likelihood (RBF, Matérn, RBF+WhiteKernel), MLE-based kernel hyperparameter optimisation, and an ensemble acquisition strategy (EI + PI + UCB) that switches between exploitation and exploration based on inter-acquisition agreement.
+| | |
+|:---|:---|
+| **Goal** | Sequential black-box **maximisation** on 8 unknown functions, NeurIPS 2020 BBO–style, **one new evaluation (x, y) per function per week** for 10 rounds. |
+| **Method** | GP surrogates (LML across kernel families), ensemble or solo acquisition (EI / PI / UCB) on a **discrete** Sobol/LHS candidate set; in-notebook comparison with Optuna, TuRBO, DE-GP-EI, etc. |
+| **How to run** | `pip install -r requirements.txt` → `python run_pipeline.py` from the repo root (see [Quick Start](#quick-start)). |
+| **Outcomes** | Best observed **y** per function and per-round strategy notes: **[Model Card — Performance](docs/model_card.md#performance)**. |
+| **Stack** | **Python 3.10+** · NumPy, SciPy · scikit-learn `GaussianProcessRegressor` · scikit-optimize (acquisition) · Matplotlib; full pipeline re-executes notebooks with `nbconvert` + `ExecutePreprocessor`. |
+
+**Evaluation budget** — Each round adds **one** evaluation per function; `data/problems/function_N/observations.csv` **accumulates** all past points. The total number of rows grows with the round index (after warm start: **10 additional** evaluations per function over the competition, not a fixed “10 points total”).
+
+**Project context** — ICL PCMLAI capstone (individual). **Relevant to:** black-box and simulation optimisation, AutoML / hyperparameter tuning, sequential experimental design.
+
+---
+
+This project follows the format of the **[NeurIPS 2020 Black-Box Optimisation Challenge](https://github.com/rdturnermtl/bbo_challenge_starter_kit)**: sequential optimisation of 8 unknown objective functions under a strict per-round evaluation budget, using the same suggest–observe API and Bayesmark evaluation framework as the competition.
+
+**Bayesian Optimisation (BO)** was chosen as the core strategy because it is specifically designed for exactly this setting — expensive black-box objectives with no access to gradients or closed-form expressions, where every evaluation counts. BO builds a probabilistic surrogate (GP) over the unknown function and uses it to decide where to query next, trading off exploration of uncertain regions against exploitation of known good ones. This makes it far more sample-efficient than random search or grid search, which matters when only **one** new evaluation per function is allowed per round. The pipeline features automatic kernel selection via log-marginal likelihood (RBF, Matérn, RBF+WhiteKernel), MLE-based kernel hyperparameter optimisation, and an ensemble acquisition strategy (EI + PI + UCB) that switches between exploitation and exploration based on **maximum pairwise** distance between the three acquisition argmaxes (see [Model card — Model description](docs/model_card.md#model-description)).
 
 **[Datasheet](docs/datasheet.md)** · **[Model Card](docs/model_card.md)**
 
@@ -62,24 +78,48 @@ GPs are data-efficient and naturally quantify uncertainty, making them well-suit
 Each notebook follows a fixed 8-section structure:
 
 1. **Setup** — imports, load observations from `data/problems/function_N/observations.csv`
-2. **Parameters** — kernel, acquisition coefficients (ξ, κ), warping, candidate sampling, ensemble mode
+2. **Parameters** — `OPTIMIZE_KERNEL`, kernel / warping, acquisition coefficients (ξ, κ), `CANDIDATE_SAMPLING_METHOD`, `USE_ENSEMBLE` (or `SOLO_STRATEGY`), `NEXT_QUERY_SOLUTION`
 3. **Visualise** — GP surrogate surfaces; 2D contour (d=2), pairwise projections (d≥3)
 4. **Acquisition** — EI/PI/UCB over a Sobol/LHS candidate set; LML kernel selection; duplicate masking
-5. **Select query** — ensemble centroid (if EI/PI/UCB disagree) or EI argmax; proximity guard
+5. **Select query** — EI argmax, or centroid of the three argmaxes when max pairwise L2 **exceeds** `AGREE_THRESHOLD`; proximity guard
 6. **MyBO vs open source** — compare with Optuna-TPE, Optuna-GP, TuRBO, DE-GP-EI
 7. **Append feedback** — after portal returns (x, y), set `IF_APPEND_DATA = True`
 8. **Save submission** — write chosen vector to `data/submissions/function_N/`
 
-**Key configuration flags** (cell 2 of each notebook):
+### Technical capabilities of the workflow
+
+The implementation separates four concerns you can tune independently in the **Parameters** cell. Together they define *how* the GP is fit, *where* the next Bayesian optimisation (BO) point is searched, *how* acquisition functions are combined, and *which* solver’s point is **submitted** to the portal versus shown only for **benchmarking** next to open-source baselines.
+
+| Capability | What it governs | Why it matters |
+|------------|------------------|----------------|
+| **`OPTIMIZE_KERNEL`** | After LML kernel **family** selection, whether lengthscales and signal variance are **MLE-tuned** (L-BFGS-B, with restarts) or **fixed**. | MLE usually adapts the surrogate to the data; turning it off can stabilise very small or very noisy runs where kernel optimisation chases noise. |
+| **`CANDIDATE_SAMPLING_METHOD`** | How the **discrete** set of points in \([0,1]^d\) is built before taking an **argmax of the acquisition** (Sobol, LHS, and in some notebooks grid or i.i.d. random). | This is the geometry of the “inner loop” for the next query: the BO proposal is the best **candidate**, not a continuous global optimiser of the acquisition. |
+| **`USE_ENSEMBLE` + `SOLO_STRATEGY`** | **Ensemble:** run EI, PI, and UCB; if **max pairwise** L2 among the three argmaxes is **≤ `AGREE_THRESHOLD`**, use the EI point; if it **exceeds** the threshold, use the **centroid** of the three argmaxes (same rule as the [model card](docs/model_card.md#model-description)). **Solo:** a single policy from `SOLO_STRATEGY` (`"EI"`, `"PI"`, or `"UCB"`). | The ensemble softens over-commitment to one acquisition; solo mode is simpler and easy to ablate. |
+| **`NEXT_QUERY_SOLUTION`** | Which key in the notebook’s `_solutions` dict (MyBO, Optuna, TuRBO, …) is **written** to `next_input.npy` and the portal string. | You can run every solver in one notebook and **switch the submission** without re-running the rest; invalid names **fall back** to `MyBO`. |
+
+**Elaboration**
+
+- **`OPTIMIZE_KERNEL`** — With `True`, the chosen kernel (after per-family LML comparison) is **re-fit** with hyperparameter optimisation, so the GP’s smoothness and noise scale track the current observations. With `False`, the optimiser is disabled for kernel parameters (`optimizer=None`, zero restarts), which is faster and can be preferable on specific functions (see per-notebook defaults).
+
+- **`CANDIDATE_SAMPLING_METHOD`** — Acquisition values are only computed on this finite set; the “next x” is its **constrained** maximiser. Sobol and LHS give space-filling designs with different low-discrepancy properties; the choice affects where the argmax is allowed to sit between rounds.
+
+- **`USE_ENSEMBLE`** — If the **largest** pairwise L2 among the EI, PI, and UCB argmaxes is at most `AGREE_THRESHOLD`, the next query is the **EI** maximiser; otherwise the **centroid** of the three argmaxes (see [model card](docs/model_card.md#model-description)). If `USE_ENSEMBLE=False`, only `SOLO_STRATEGY` is used, matching a classic single-acquisition BO loop.
+
+- **`NEXT_QUERY_SOLUTION`** — The notebook typically computes one `next_x` per method (MyBO, Optuna-TPE, etc.); this flag only selects which vector enters **weekly submission** files. The others remain in the notebook for **fair comparison** on the same observation history.
+
+**Full flag reference** (cell 2 of each notebook; includes warping, masking, and kernel forcing):
 
 | Flag | Default | Effect |
 |------|---------|--------|
-| `GP_KERNEL` | `None` (LML auto) | Force kernel: `'RBF'`, `'Matern'`, `'RBF + WhiteKernel'` |
-| `OUTPUT_WARPING` | `None` | `'log'` for F1/F5/F7 (skewed y); `'boxcox'` optional |
-| `USE_ENSEMBLE` | `True` | Centroid of EI/PI/UCB when they disagree by > 0.15 L2 |
-| `MIN_DIST_THRESHOLD` | `0.05` | Mask candidates within this L2 distance of any prior obs |
-| `BOUNDARY_MARGIN` | `0.05` (d≤3), `0` (d≥4) | Mask near-boundary candidates (curse of dimensionality) |
-| `NEXT_QUERY_SOLUTION` | `'MyBO'` | Which solver's vector to save: MyBO / Optuna-TPE / TuRBO / … |
+| `OPTIMIZE_KERNEL` | notebook-dependent | `True`: MLE for kernel params (L-BFGS-B, `N_RESTARTS_KERNEL` restarts). `False`: fixed kernel params, `optimizer=None`. |
+| `CANDIDATE_SAMPLING_METHOD` | e.g. `"sobol"`, `"lhs"` | Candidate pool for **acquisition argmax**; often `"sobol"` or `"lhs"`; F1 also `"grid"` / `"random"`. |
+| `USE_ENSEMBLE` | `True` | `True`: EI+PI+UCB; max pairwise L2 ≤ `AGREE_THRESHOLD` → EI argmax, else → centroid. `False`: `SOLO_STRATEGY` only. |
+| `SOLO_STRATEGY` | e.g. `"UCB"` | Used only if `USE_ENSEMBLE=False`: `"EI"`, `"PI"`, or `"UCB"`. |
+| `NEXT_QUERY_SOLUTION` | `'MyBO'` | Key in `_solutions` to export; unknown key → `MyBO`. |
+| `GP_KERNEL` | `None` (LML auto) | Force kernel: `'RBF'`, `'Matern'`, `'RBF + WhiteKernel'`. |
+| `OUTPUT_WARPING` | `None` | `'log'` (e.g. F1/F5/F7); optional `'boxcox'`. |
+| `MIN_DIST_THRESHOLD` | `0.05` | Drop candidates too close to past observations (L2). |
+| `BOUNDARY_MARGIN` | `0.05` (d≤3), `0` (d≥4) | Optional mask near domain boundaries. |
 
 ---
 
@@ -104,10 +144,17 @@ pip install -r requirements-benchmark.txt
 python append_results/run_optimizers_on_data.py --solvers my_bo optuna turbo de_gp_ei
 ```
 
-**Append a new week's portal results** (idempotent, version-controlled):
+**Append a new week’s portal results** (idempotent, version-controlled): run the script that matches the **week** you are recording (the repo includes `append_week1_results.py` … `append_week11_results.py`). Example for round 10:
 ```bash
 python append_results/append_week10_results.py
 ```
+
+### Reproducibility and validation
+
+- **Data state** — `run_pipeline.py` runs `append_results/*.py` (unless `--skip-scripts`), then executes all eight notebooks. Outputs depend on the current `observations.csv` files; re-running after appending a week changes the “next query” and plots.
+- **Randomness** — Notebooks set seeds where they sample candidates and related draws; L-BFGS-B MLE in scikit-learn and floating-point order can still yield **small run-to-run differences** on the same data.
+- **Execution** — Each notebook is capped at a **5-minute** execute timeout in the pipeline; a full `run_pipeline.py` may take on the order of **several minutes to tens of minutes** depending on hardware.
+- **Tests** — There is **no** automated `pytest` suite; correctness is checked by **running** `run_pipeline.py` and inspecting submissions under `data/submissions/`. Add CI if you fork this for production use.
 
 ---
 
@@ -145,7 +192,7 @@ black-box-optimization/
 │       └── sampling_utils.py                     # sample_candidates() wrapper
 │
 ├── append_results/
-│   ├── append_week{1..10}_results.py            # Append portal (x, y) to observations.csv
+│   ├── append_week{1..11}_results.py            # Append portal (x, y) to observations.csv (one file per week)
 │   └── run_optimizers_on_data.py                # Benchmark solvers on accumulated data
 │
 ├── configs/

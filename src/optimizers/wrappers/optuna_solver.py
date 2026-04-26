@@ -275,4 +275,11 @@ def suggest(
             out[j] = lo
         else:
             out[j] = lo + x_01[j] * (hi - lo)
-    return np.clip(out, [b[0] for b in bounds], [min(b[1], 0.999999) for b in bounds])
+    out = np.clip(out, [b[0] for b in bounds], [min(b[1], 0.999999) for b in bounds])
+    try:
+        from src.utils.unique_query import ensure_distinct_from_observations
+
+        out = ensure_distinct_from_observations(out, X, bounds, min_l2=1e-3, seed=seed)
+    except ImportError:
+        pass
+    return out

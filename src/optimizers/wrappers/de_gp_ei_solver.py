@@ -168,4 +168,11 @@ def suggest(
         disp=False,
     )
     x_next = np.asarray(result.x, dtype=np.float64).ravel()
-    return np.clip(x_next, 1e-10, 1.0 - 1e-10)
+    x_next = np.clip(x_next, 1e-10, 1.0 - 1e-10)
+    try:
+        from src.utils.unique_query import ensure_distinct_from_observations
+
+        x_next = ensure_distinct_from_observations(x_next, X, bounds, min_l2=1e-3, seed=seed)
+    except ImportError:
+        pass
+    return x_next

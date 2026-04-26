@@ -370,7 +370,7 @@ def suggest(
 
     next_x = np.clip(next_x, 0.0, 0.999999)
 
-    # Duplicate check
+    # First-line duplicate escape (prefer space-filling candidate)
     dist_to_obs = np.sqrt(((X_01 - next_x) ** 2).sum(axis=1))
     nearest_dist = dist_to_obs.min()
     if nearest_dist < duplicate_threshold:
@@ -383,4 +383,18 @@ def suggest(
         if abs(hi - lo) > 1e-12:
             out[j] = lo + next_x[j] * (hi - lo)
     out = np.clip(out, [b[0] for b in bounds], [min(b[1], 0.999999) for b in bounds])
+
+    try:
+        from src.utils.unique_query import ensure_distinct_from_observations
+
+        out = ensure_distinct_from_observations(
+            out,
+            X,
+            bounds,
+            min_l2=duplicate_threshold,
+            seed=seed,
+            fallback_01=np.clip(next_x_high_dist, 0.0, 1.0),
+        )
+    except ImportError:
+        pass
     return out

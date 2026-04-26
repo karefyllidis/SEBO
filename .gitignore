@@ -37,6 +37,8 @@ venv.bak/
 # VS Code
 .vscode/
 
+# Cursor IDE (rules, skills, local config — do not version)
+.cursor/
 # Cursor index (large, can cause slowness when opening project)
 .git/cursor/
 .cursorignore
