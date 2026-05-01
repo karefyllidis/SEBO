@@ -1,0 +1,99 @@
+BBO capstone project — Module 23.2: presentation responses
+Nikolas Karefyllidis, PhD — ICL PCMLAI, Stage 2
+
+--------------------------------------------------------------------------------
+1. OVERVIEW OF YOUR BBO APPROACH
+--------------------------------------------------------------------------------
+
+What I am trying to achieve
+
+The capstone requires maximisation of eight unknown objective functions, each defined on the unit hypercube [0,1]^d for d in {2,...,8}. In each round, I may submit one new input vector x per function to the capstone portal and receive a single scalar return y. The underlying objectives are not provided in closed form; gradient information and free intermediate evaluations are unavailable. The evaluation budget is therefore strictly limited, and the task reduces to a standard problem in applied optimisation: given all observations to date, select the next experiment so as to improve the best observed outcome as effectively as possible.
+
+Why I chose Bayesian optimisation
+
+I decided to follow a Bayesian optimisation (BO) approach as the core of my work because this class of methods is designed precisely for that situation — expensive, noisy, black-box objectives where the only information comes from a sequence of point evaluations. The alternative of dense grid search is impossible in high dimension; uniform random search does not use the structure already revealed in the data. BO instead posits a probabilistic belief over the unknown function, updates that belief as new (x, y) pairs arrive, and uses the belief to decide the next x.
+
+Concretely, I use a Gaussian process (GP) as the surrogate. The GP gives, at every x, a posterior mean (which I can read as “how good the model thinks this region is”) and a posterior uncertainty (where the model is still unsure or where data are sparse). I then use an acquisition function to turn mean and uncertainty into a single score for “where to query next.” I implement several standard acquisitions — expected improvement, probability of improvement, and an upper confidence bound — because each emphasises exploration versus exploitation in a slightly different way. Together, they form a principled way to trade off trying promising regions of the space and probing regions where the model is still epistemically uncertain. That is more sample-efficient than ad hoc heuristics when the number of allowed evaluations is small.
+
+How my process fits together in this repository
+
+In practice, my pipeline is the same for each function, implemented in a dedicated notebook. I load the accumulated observations from a CSV. I select the kernel family (RBF, Matérn, or RBF with a white noise term) by comparing log-marginal likelihood, and I optimise lengthscales with maximum likelihood when that remains stable. I do not take the argmax of the acquisition on the whole continuous box with a perfect optimiser: I first generate a large but finite set of candidate points (Sobol or Latin hypercube) so the step remains reproducible and numerically well behaved. I then run EI, PI, and UCB on that set. If the three proposed points are close to one another, I treat the acquisitions as “in agreement” and I submit the EI argmax. If they are far apart, I submit the centroid of the three, which is a simple way to avoid having one acquisition dominate when the landscape is still ambiguous. The chosen vector is written to a portal string; after the system returns y, I append the row. The weekly submission to the capstone is my GP-based implementation (“MyBO”), while solvers such as Optuna and TuRBO in the same notebook are there for fair comparison, not for the default hand-in, unless I explicitly switch a flag to export another method.
+
+Non-technical summary (to accompany section 1)
+
+In brief: there are eight separate problems, each of which can only be probed by submitting a setting and reading a single performance score. The internal rule is not available for inspection. A probability model (the Gaussian process) is fitted to all past settings and scores; it both summarises which regions are currently most promising and where uncertainty remains. The policy that selects the next setting therefore supports a balance between improving on the best configuration identified so far and exploring regions in which the evidence is still incomplete.
+
+--------------------------------------------------------------------------------
+2. HOW YOUR STRATEGY HAS EVOLVED
+--------------------------------------------------------------------------------
+
+How the approach changed from the first rounds to now
+
+In the first rounds, my strategy was almost necessarily conservative in the same way for all eight problems: the warm start was small, the surrogate was weak everywhere, and I had to let exploration and kernel flexibility carry more of the load. I also tended to use similar acquisition settings on every function because I did not yet have enough evidence to treat them as qualitatively different. As the datasets grew, my approach became more structured and more repeatable. I now follow a fixed weekly cycle — reload data, select kernel and hyperparameters, fit the GP, compute acquisitions, write the next query, reflect — and I allow different treatment per function when the data clearly suggest it (for example, output warping for outputs that span very large positive ranges, or extra caution when the same x appears twice with different y, which I treat as a sign of noise or a limitation of a stationary model).
+
+What influenced those changes
+
+The main drivers were the actual trends in the returned y values, the behaviour of the fitted surrogate, and the weekly written reflections the course required. For example, the four-dimensional chemical-yield style function (F5) moved toward very high y when several input coordinates were pushed together toward 1, which nudged me toward expecting a “ridge” in the high corner and toward trusting more exploitation along that pattern once the GP had enough support. The two-dimensional “radiation” style function (F1) shows a sparse response: the best y is near 0.67 in my log, but most evaluated points are still close to zero, which reinforced that global coverage is not the point — finding the small region of interest is. The eight-dimensional stand-in (F8) has improved steadily in my file to about 9.96, which made it reasonable to take the surrogate seriously for local refinement. When the five-dimensional recipe function (F6) returned the same x on different weeks with a different y, I stopped reading a single return as a definitive “global optimum” and thought more in terms of noise, duplicate policy, and candidate design.
+
+The principles that guide my query decisions now
+
+First, the next query should be supported by the current posterior, not by an ad hoc narrative carried over from the earliest rounds. Second, a large exploratory step is warranted only when the acquisition function (or a markedly elevated predictive variance) justifies the cost; otherwise the emphasis falls on local refinement about the best observed y, particularly in regions in which the model has already assigned high posterior mass. Third, in higher dimension, the same logic that motivates principal component analysis applies qualitatively: at fixed sample size, not all input directions are equally informative for y. I therefore use estimated lengthscales and acquisition values as evidence of which inputs are currently “active” and seek to avoid redundant experiments that do not materially update belief about the maximum. This is not a substitute for a formal PCA of inputs each week, but the objective is analogous: to concentrate remaining budget where further learning and variance reduction are still possible.
+
+Bayesian optimisation remains the methodological core; the refinement has been in adapting its implementation to the distinct behaviour of each of the eight objective instances.
+
+--------------------------------------------------------------------------------
+3. PATTERNS, DATA AND INSIGHTS
+--------------------------------------------------------------------------------
+
+What the numbers in my current observation files show
+
+Unless otherwise stated, the figures below are the best observed y (the maximum in my CSV) for each function, which is the natural incumbent when higher y is always better, including for the negative objective functions (where the best value is the least bad, i.e. the algebraically largest y).
+
+F1: best y = 0.670 (2D; radiation-style sparse signal: most of the space gives y near 0).  
+F2: best y = 0.725 (2D; noisy, multimodal).  
+F3: best y = −0.0159 (3D; drug-discovery style — maximise the least negative score).  
+F4: best y = 0.299 (4D; warehouse / highly non-convex; some very bad y exist in the log).  
+F5: best y = 7493.88 at the input x = (0.980, 0.984, 0.975, 0.996) (4D; chemical process yield: clear “all high” pattern).  
+F6: best y = −0.188 (5D; recipe: negative by design; I have also seen the same x with two different y).  
+F7: best y = 2.797 (6D; hyperparameter-style smooth performance).  
+F8: best y = 9.962 (8D; in my file the y values run from about 5.6 up to 9.96 over 49 evaluations, i.e. a long upward track).
+
+The most important qualitative patterns I take from this
+
+The chemical-style problem F5 and the high-dimensional F8 are the standouts where a sustained story of improvement is easy to read from the data: in F5, several coordinates move together to the upper part of the box; in F8, the trajectory over many points suggests a learnable, smooth-enough response for the GP to add value. F1 is the opposite in spirit: the domain is 2D but the “interesting” set is a narrow pocket, so the pattern is about location, not about covering the whole unit square. F3 and F6 are negative objectives, so the story is about finding pockets of “least bad” y; F6 also teaches me to treat the oracle as possibly stochastic at identical x. F4 is the one where a single very bad y or odd repeats remind me that multimodality and outliers can make any stationary smooth GP look too confident if I am not careful in how I read the acquisition and the design of the candidate set.
+
+How that shapes my understanding of the search process
+
+I now think of the capstone less as a single “global search” in an abstract 8D cube and more as a series of information-gathering steps where some directions in x and some regions of the space explain most of the change in the observed y at my current sample size — similar in spirit to the way principal components summarise where variance lies in a multivariate data set, except here the target is an unknown maximum under a small budget. I also think explicitly about redundant queries: if a new point is unlikely to move my belief about the maximum, I should not spend the budget there. That is not always easy to do perfectly, but the Bayesian story gives a language for it (posterior, acquisition, and iteration).
+
+--------------------------------------------------------------------------------
+4. DECISION-MAKING AND ITERATION
+--------------------------------------------------------------------------------
+
+How I balance exploration and exploitation
+
+Exploration in my workflow is anything that the acquisition drives toward regions with high predictive variance or with inconsistent acquisition maxima, because those are places where the next evaluation might resolve ambiguity. Exploitation is when the EI, PI, and UCB maxima cluster together near the current best y and the model is confident in a local region — then I am comfortable taking a step that looks “greedy” in x because the model says the expected improvement is still meaningful. I always compute acquisitions on a space-filling candidate set, which avoids a fragile continuous optimisation of the acquisition on a rough landscape.
+
+Two kinds of example from the actual run
+
+A constructive pattern: for F5 and F8, refitting a GP on the full log with a kernel selected by LML, then following the acquisition, matches the intended behaviour — F5 with an incumbent in the 0.98+ region and F8 with a best y near 9.96 after a substantial run length — which indicates that the procedure is not merely overfitting to isolated favourable draws but is identifying a useful region of the input space. A more difficult pattern: for F4, the response can be highly non-convex and the log may contain large negative outliers; for F6, repeated x with different y requires a decision on candidate correction, on treating replicates as noise observations, or on acknowledging limitations of a stationary kernel. The portal returns are never modified; the observation is appended, the model is refit, and the subsequent query follows from the updated posterior. Adjustments are confined to the experimental protocol (candidates, distance thresholds, and interpretation), not to the recorded outputs.
+
+How I treat uncertainty and surprises
+
+I treat a large residual between observed y and the previous posterior mean as something the GP is allowed to account for (usually via noise terms or a flatter local posterior) on the next fit. I do not alter y by hand. That keeps the work honest: the story is a Bayesian one in which the next query is a function of the data we actually received, not a wishful narrative.
+
+--------------------------------------------------------------------------------
+5. NEXT STEPS AND REFLECTION
+--------------------------------------------------------------------------------
+
+Planned next actions before the end of the capstone (for example the final round in Module 24)
+
+Where the surrogate is clearly confident and the best y is improving only slowly (F5, F8), I expect to invest most of the remaining query budget in targeted exploitation — small, acquisition-supported moves in the neighbourhood of the incumbent, unless a diagnostic still shows a pocket of high variance that is worth a single broader probe. In the highest dimensions (F7, F8) I will only take a non-local “exploratory” point if the acquisition still places meaningful mass there, because blind random restarts in 8D are unlikely to help under a tiny budget. I will also finalise a clean audit trail: every portal return in the CSV, append scripts documented, and a frozen environment file so a reader can re-run the notebooks if needed.
+
+How this links to the broader machine learning landscape
+
+Hyperparameter tuning for large machine learning systems, the tuning of simulators, and the optimisation of physical processes in industry are all instances of the same problem class: a black box, expensive evaluations, and a need to be efficient. Principal component analysis is often used in industry to describe a few directions that account for most of the variation in a large set of process variables; in a loose analogy, I am using the BO surrogate and acquisitions to point the search toward regions of the input space where the remaining uncertainty and the possible improvement in y are both meaningful. The methods are not identical, but the emphasis on not wasting data on directions that are already explained or on redundant points is the same in spirit.
+
+How I would communicate the outcome to a non-technical audience
+
+The work can be described without technical detail as follows. There are eight independent problems; in each period one additional configuration may be tested for each, and the only feedback is a scalar performance measure. The underlying mechanism that maps configurations to results is not disclosed. The procedure aggregates all past tests, estimates where better outcomes may be obtained, and recommends the next test so that improvement on the best configuration to date is pursued without neglecting regions that remain poorly characterised. In the data recorded to date, the best observed return on the four-input chemical-process analogue is approximately 7493, obtained with all four inputs in the upper part of the allowed range; on the eight-input analogue, the best observed return is approximately 9.96. Beyond these maxima, the value of the exercise for an organisation is traceability: every submitted configuration and every returned value are retained in the project’s observation files, so the sequence of design decisions is open to review and the workflow can be reproduced or audited.
