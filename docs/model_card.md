@@ -1,12 +1,14 @@
 # Model Card — GP-based Bayesian Optimisation Pipeline
 
 **Author:** Nikolas Karefyllidis, PhD
-**Version:** 1.0 (Round 10 final)
-**Last updated:** April 2026
+**Version:** 1.3 (challenge complete — final archive)
+**Last updated:** May 2026
 
 ---
 
 ## Overview
+
+**Capstone status:** The ICL BBO challenge is **complete**; no further oracle evaluations or portal submissions. This card and the repo describe the **final** method and observation history.
 
 **Name:** MyBO — GP Surrogate with Ensemble Acquisition
 **Type:** Sequential, model-based black-box optimiser (maximisation)
@@ -46,26 +48,35 @@
 
 2. **Output warping.** For skewed or multi-scale y, the GP is fitted on a transformed target (`log` or `Box-Cox`). Functions using log warping by default: F1, F5, F7. Acquisition and incumbent tracking operate in warped space; raw y is stored and reported.
 
-3. **Acquisition maximisation.** Three acquisition functions are computed over a Sobol/LHS candidate set of size 2^15–2^18:
-   - **EI** (Expected Improvement, ξ = 0.01 by default)
-   - **PI** (Probability of Improvement, ξ = 0.01)
-   - **UCB** (Upper Confidence Bound, κ = 2.0)
-   Candidates within `MIN_DIST_THRESHOLD` (L2 distance) of any prior observation are masked to prevent re-querying. Boundary masking (`BOUNDARY_MARGIN`) is applied for d ≤ 3 only.
+3. **Acquisition maximisation.** Three acquisition functions are computed over a Sobol/LHS candidate set of size 2^15–2^18, using scikit-optimize (`gaussian_ei`, `gaussian_pi`, `gaussian_lcb`). **ξ** (`XI_EI_PI`) and **κ** (`KAPPA_UCB`) are set **per function** in each notebook’s Parameters cell (no single global default). For the late-round phase, settings were tuned **exploit-leaning** (lower ξ, lower κ than mid-competition exploration settings), except F5 where κ stays **very small** (0.01) so UCB remains stable under **log** output warping. Candidates within `MIN_DIST_THRESHOLD` (L2 distance) of any prior observation are masked to prevent re-querying. Boundary masking (`BOUNDARY_MARGIN`) is applied for d ≤ 3 only.
 
-4. **Ensemble decision.** If the maximum pairwise L2 distance between the three acquisition argmaxes exceeds `AGREE_THRESHOLD = 0.15`, the next query is the centroid of the three candidates (exploration signal). Otherwise, the EI argmax is used (exploitation signal). A solo mode (`USE_ENSEMBLE = False`) is available for direct comparison.
+**Round 10 acquisition hyperparameters (see also root README):**
+
+| Fn | ξ (`XI_EI_PI`) | κ (`KAPPA_UCB`) | `AGREE_THRESHOLD` |
+|----|----------------|-----------------|---------------------|
+| F1, F2 | 0.02 | 0.75 | 0.22 |
+| F3 | 0.005 | 0.75 | 0.12 |
+| F4 | 0.02 | 1.0 | 0.22 |
+| F5 | 0.005 | 0.01 | 0.22 |
+| F6 | 0.005 | 1.0 | 0.22 |
+| F7 | 0.005 | 0.6 | 0.22 |
+| F8 | 0.005 | 0.8 | 0.22 |
+
+4. **Ensemble decision.** Let **d_max** be the maximum pairwise L2 distance among the EI, PI, and UCB argmaxes. If **d_max < AGREE_THRESHOLD**, the next query is the **EI** argmax; if **d_max ≥ AGREE_THRESHOLD**, the next query is the **centroid** of the three argmaxes (blend when acquisitions disagree). **Solo** mode (`USE_ENSEMBLE = False`) uses only `SOLO_STRATEGY` (e.g. F5 defaults to UCB solo). Thresholds are per notebook (see table above).
 
 **External baselines (Section 6 of each notebook).** For comparison, the pipeline also queries Optuna-TPE, Optuna-GP, TuRBO, and DE-GP-EI and overlays their suggestions on the same plots.
 
 ---
 
-## Strategy Evolution Across Ten Rounds
+## Strategy Evolution Across Competition Rounds
 
 | Rounds | Key changes |
 |--------|-------------|
 | 1–3 | EI only, single RBF kernel, Sobol candidates. Exploration-heavy (ξ = 0.05–0.1). Initial warm-start data only. |
 | 4–6 | LML kernel selection introduced. Matérn and RBF+WhiteKernel added. Ensemble acquisition (EI+PI+UCB). Per-function `MIN_DIST_THRESHOLD` and `BOUNDARY_MARGIN`. Output warping for F1, F5, F7. |
 | 7–8 | `N_RESTARTS_KERNEL` scaled with dimensionality (20 for 5D–6D). Transition from exploration to exploitation for functions with stable incumbents (F5, F8). UCB preferred for sparse high-D functions. |
-| 9–10 | Mostly exploitation. F6 identified as potentially noisy (same x returned different y across rounds 8–10); duplicate rows retained and `GP_ALPHA` raised to 1e-3 for numerical stability. F5 confirmed near-boundary region as global optimum. |
+| 9–10 | Mostly exploitation. F6 identified as potentially noisy (same x returned different y across rounds 8–10); duplicate rows retained and `GP_ALPHA` raised to 1e-3 for numerical stability. F5 confirmed near-boundary region as global optimum. **Round 10:** notebook `XI_EI_PI`, `KAPPA_UCB`, and `AGREE_THRESHOLD` frozen to exploit-leaning values (documented in root README and this card). |
+| 11–13 | Weekly portal feedback appended via idempotent append scripts. Duplicate-x handling remained enabled (notably for F6). Incumbents improved further for F3 and F6 after additional rounds. |
 
 ---
 
@@ -73,14 +84,14 @@
 
 **Metric.** Best observed y after all rounds (incumbent value). No ground truth available; performance is relative and compared across rounds via cumulative-best plots in each notebook.
 
-| Function | Initial best y (10 pts) | Best y after Round 10 | Improvement | Notes |
+| Function | Initial best y (10 pts) | Best y in current dataset (through Week 13) | Improvement | Notes |
 |----------|------------------------|----------------------|-------------|-------|
 | F1 | ~0.0 | 0.6704 | Large | Narrow high region found in round 10 |
 | F2 | ~0.19 | 0.7248 | Large | Best at x₁ ≈ 0.70 |
-| F3 | ~−0.44 | −0.0189 | Moderate | Output is always negative; improvement = less negative |
+| F3 | ~−0.44 | −0.0032 | Large | Output is always negative; improvement = less negative |
 | F4 | ~0.04 | 0.2987 | Moderate | High variance; many local optima |
 | F5 | ~1700 | 7493.9 | Very large | Near-boundary region [0.99, 0.99, …] |
-| F6 | ~−1.3 | −0.1883 | Moderate | Noisy oracle; surrogate stuck in one region from round 8 |
+| F6 | ~−1.3 | −0.1402 | Large | Noisy oracle behavior; repeated x with different y (captured in CSV) |
 | F7 | ~0.003 | 2.7968 | Large | Steady improvement via UCB exploration |
 | F8 | ~5.6 | 9.9619 | Large | Consistent upward trend across all rounds |
 
@@ -96,7 +107,7 @@
 
 2. **Smoothness.** The RBF/Matérn kernels assume the function is at least once-differentiable. Step functions or discontinuous objectives would require a different kernel family.
 
-3. **Fixed budget awareness.** The pipeline does not dynamically adjust exploration rate based on remaining budget. A cooling schedule (decreasing ξ or κ over rounds) is applied manually per function rather than automatically.
+3. **Fixed budget awareness.** The pipeline does not dynamically adjust exploration rate based on remaining budget. **ξ**, **κ**, and ensemble `AGREE_THRESHOLD` were adjusted **manually** across rounds; late-round settings are recorded in the notebooks and in the README (not an automated schedule).
 
 4. **Determinism.** The pipeline assumes oracle evaluations are deterministic by default (`GP_ALPHA = 1e-6`). For F6, evidence of oracle noise led to retaining duplicate observations and raising `GP_ALPHA` to `1e-3`.
 
@@ -111,7 +122,7 @@
 
 ## Ethical Considerations
 
-**Transparency.** Every query and its oracle response is logged verbatim in version-controlled CSVs. Each notebook documents the kernel chosen, its hyperparameters after LML optimisation, the acquisition function and its settings, and the reasoning behind per-function configuration choices in markdown cells. A researcher with access to the repository, a matching Python environment (`requirements.txt`), and the same random seeds (set at the top of each notebook) can reproduce any round's suggested query deterministically.
+**Transparency.** Every query and its oracle response is logged verbatim in **local** `observations.csv` files (gitignored on the public remote so oracle trails are not published). Each notebook documents the kernel chosen, its hyperparameters after LML optimisation, the acquisition function and its settings, and the reasoning behind per-function configuration choices in markdown cells. A researcher with the **same** local observation files, a matching Python environment (`requirements.txt`), and the same random seeds (set at the top of each notebook) can reproduce any round's suggested query deterministically.
 
 **Reproducibility.** The `append_results/append_weekN_results.py` scripts record portal-returned values exactly as received, making the data trail unbroken from Week 1. External solver comparisons (Optuna, TuRBO, DE-GP-EI) are wrapped in consistent interfaces (`src/optimizers/wrappers/`) and logged alongside MyBO suggestions in each notebook.
 

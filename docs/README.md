@@ -2,7 +2,8 @@
 
 | Path | Role |
 |------|------|
-| [README.md](../README.md) | Main entry: workflow, structure, methods, references |
+| [README.md](../README.md) | Main entry: workflow, structure, methods, references; **challenge complete** (final data through Week 13) |
+| [model_card.md](model_card.md) | Model architecture, **per-function acquisition hyperparameters**, performance |
 | [project_roadmap.md](project_roadmap.md) | Layout, notebook steps, planned pieces |
 | [Capstone_Project_FAQs.md](Capstone_Project_FAQs.md) | Capstone-specific data, submission, Section 6 |
 | [TECHNICAL_FOUNDATIONS.md](TECHNICAL_FOUNDATIONS.md) | Papers, library choices, “where to read more” |
