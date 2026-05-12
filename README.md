@@ -74,9 +74,9 @@ Domain: **[0, 1]^d** for all functions. Higher y is always better; F3 and F6 out
 
 ### Example: GP Surrogate — Function 3 (Drug Discovery, 3D)
 
-![GP surrogate pairwise projections for Function 3](docs/gp_surrogate_function3.png)
+![GP surrogate evolution — posterior mean slices (Function 3)](docs/gp_surrogate_function3_evolution.gif)
 
-*Pairwise IDW-interpolated projections of the GP surrogate after 25 observations. Red dots are evaluated query points (numbered by round). The warm (light) regions indicate higher predicted y; the surrogate identifies a promising cluster near x₁ ≈ 0.15–0.20 in the x₁–x₂ plane.*
+*Weekly evolution of the **GP posterior mean** on three pairwise slices (fixed coordinates: median of the other dimension at each frame). Warm-start observations first, then one portal evaluation per round; red markers are queries numbered in chronological order. The μ colour scale is held fixed across frames using the range from the **final** surrogate so colours are comparable. A static snapshot is also in [`docs/gp_surrogate_function3.png`](docs/gp_surrogate_function3.png). Regenerate the GIF locally with `python scripts/export_function3_gp_evolution_gif.py` once `data/problems/function_3/observations.csv` is present.*
 
 ---
 
@@ -232,6 +232,9 @@ black-box-optimization/
 ├── append_results/
 │   ├── append_week{1..13}_results.py            # Append portal (x, y) to observations.csv (one file per round)
 │   └── run_optimizers_on_data.py                # Benchmark solvers on accumulated data
+│
+├── scripts/
+│   └── export_function3_gp_evolution_gif.py     # Build docs/gp_surrogate_function3_evolution.gif (needs local observations.csv)
 │
 ├── configs/
 │   ├── optuna_optimizer.yaml
