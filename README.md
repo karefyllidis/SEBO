@@ -74,9 +74,9 @@ Domain: **[0, 1]^d** for all functions. Higher y is always better; F3 and F6 out
 
 ### Example: GP Surrogate — Function 3 (Drug Discovery, 3D)
 
-![GP surrogate evolution — posterior mean slices (Function 3)](docs/gp_surrogate_function3_evolution.gif)
+![Pairwise IDW projections evolution — Function 3](docs/gp_surrogate_function3_evolution.gif)
 
-*Weekly evolution of the **GP posterior mean** on three pairwise slices (fixed coordinates: median of the other dimension at each frame). Warm-start observations first, then one portal evaluation per round; red markers are queries numbered in chronological order. The μ colour scale is held fixed across frames using the range from the **final** surrogate so colours are comparable. A static snapshot is also in [`docs/gp_surrogate_function3.png`](docs/gp_surrogate_function3.png). Regenerate the GIF locally with `python scripts/export_function3_gp_evolution_gif.py` once `data/problems/function_3/observations.csv` is present.*
+*Weekly evolution of the **pairwise IDW-interpolated** projections of observed `y` for Function 3, with the same aesthetic as the static [`docs/gp_surrogate_function3.png`](docs/gp_surrogate_function3.png). Red dots are evaluations, numbered by round (warm-start 1–15 first, then one new query per portal round). The magma colour scale (and contour levels) are held fixed across all frames using the final-frame range, so colours are directly comparable. Regenerate locally with `python scripts/export_function3_gp_evolution_gif.py` once `data/problems/function_3/observations.csv` is present.*
 
 ---
 

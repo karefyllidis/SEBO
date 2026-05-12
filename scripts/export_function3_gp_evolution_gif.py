@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Build an animated GIF of Function 3 GP surrogate mean slices as observations accumulate.
+Build an animated GIF of Function 3 observation evolution as the BO loop progresses.
 
-Mirrors ``notebooks/function_3_Drug-Discovery.ipynb`` GP kernels, LML selection,
-pairwise slice geometry (median held-out coordinate), and contour styling for the
-**posterior mean** row only (keeps file size reasonable).
+Mirrors the **IDW pairwise** plot from Section 2 of
+``notebooks/function_3_Drug-Discovery.ipynb`` (inverse-distance-weighted y surface,
+magma colormap, red observations with white round numbers, "(interpolated)" titles,
+shared y colourbar on the right). Frames step through the observation count, from
+the warm-start (15 points) to the full dataset.
 
-Requires a local ``data/problems/function_3/observations.csv`` (warm-start rows first,
-then weekly appends). Run from the repository root:
+Requires a local ``data/problems/function_3/observations.csv`` (warm-start rows
+first, then weekly appends). Run from the repository root:
 
     python scripts/export_function3_gp_evolution_gif.py
 
@@ -26,13 +28,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
-from sklearn.gaussian_process import GaussianProcessRegressor  # noqa: E402
-from sklearn.gaussian_process.kernels import (  # noqa: E402
-    ConstantKernel,
-    Matern,
-    RBF,
-    WhiteKernel,
-)
 
 # Repo root (parent of scripts/)
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,279 +36,122 @@ if str(ROOT) not in sys.path:
 
 from src.utils.load_challenge_data import load_function_data, load_problem_data_csv  # noqa: E402
 from src.utils.plot_utilities import setup_matplotlib  # noqa: E402
-from src.utils.warping import apply_output_warping  # noqa: E402
 
-# --- Defaults aligned with ``function_3_Drug-Discovery.ipynb`` Parameters / GP cells ---
-OUTPUT_WARPING = None
-CONSTANT_KERNEL_SCALE = 1.0
-LENGTH_SCALE = 1.0
-GP_ALPHA = 1e-6
-MATERN_NU = 1.5
-WHITE_NOISE_LEVEL = 1e-5
-GP_KERNEL = None  # None → LML pick among three kernels
-OPTIMIZE_KERNEL = True
-N_RESTARTS_KERNEL = 15
-CONSTANT_SCALE_BOUNDS = (1e-3, 1e3)
-LENGTH_SCALE_BOUNDS = (1e-2, 100)
-WHITE_NOISE_BOUNDS = (1e-12, 1e1)
-
+# --- Aesthetic constants aligned with Section 2 of function_3_Drug-Discovery.ipynb ---
+CMAP = "magma"
 CONTOURF_LEVELS = 30
 CONTOUR_LINE_LEVELS = 11
 CONTOUR_LINEWIDTH = 1.0
-CONTOUR_LINESTYLE = "-"
 CONTOUR_ALPHA = 0.5
-
-CANONICAL_NAMES = ["RBF", "Matérn (ν=1.5)", "RBF + WhiteKernel"]
-KERNEL_ALIASES = {
-    "rbf": "RBF",
-    "matern": "Matérn (ν=1.5)",
-    "matérn (ν=1.5)": "Matérn (ν=1.5)",
-    "matern (ν=1.5)": "Matérn (ν=1.5)",
-    "rbf + whitekernel": "RBF + WhiteKernel",
-    "rbf+whitekernel": "RBF + WhiteKernel",
-    "rbf + white": "RBF + WhiteKernel",
-    "white": "RBF + WhiteKernel",
-}
+SCATTER_EDGE_LW = 1.5
+SCATTER_SIZE = 50
+N_GRID = 60  # Section 2 uses n_grid_viz = 60
+F3_FIG_1X3 = (16.0, 5.0)
+PAIRS = [
+    (0, 1, r"$x_1$", r"$x_2$"),
+    (0, 2, r"$x_1$", r"$x_3$"),
+    (1, 2, r"$x_2$", r"$x_3$"),
+]
 
 
-def _normalize_kernel_input(val: object) -> str | None:
-    if val is None:
-        return None
-    s = str(val).strip()
-    if s.lower() in ("none", ""):
-        return None
-    return s
-
-
-def _resolve_kernel_name(user_input: str | None) -> str | None:
-    if user_input is None:
-        return None
-    key = user_input.lower().strip()
-    if key in KERNEL_ALIASES:
-        return KERNEL_ALIASES[key]
-    if user_input in CANONICAL_NAMES:
-        return user_input
-    for c in CANONICAL_NAMES:
-        if c.lower() == key or key in c.lower():
-            return c
-    return None
-
-
-def fit_best_gp(
-    X: np.ndarray,
-    y: np.ndarray,
-    *,
-    gp_kernel: str | None,
-    optimize_kernel: bool,
-    n_restarts_kernel: int,
-) -> tuple[GaussianProcessRegressor, str]:
-    """Fit three kernels, pick best by LML (or forced kernel). Matches notebook logic."""
-    _gp_optimizer = None if not optimize_kernel else "fmin_l_bfgs_b"
-    _gp_n_restarts = n_restarts_kernel if optimize_kernel else 0
-
-    kernel_RBF = (
-        ConstantKernel(CONSTANT_KERNEL_SCALE, constant_value_bounds=CONSTANT_SCALE_BOUNDS)
-        * RBF(length_scale=LENGTH_SCALE, length_scale_bounds=LENGTH_SCALE_BOUNDS)
-    )
-    kernel_Matern = (
-        ConstantKernel(CONSTANT_KERNEL_SCALE, constant_value_bounds=CONSTANT_SCALE_BOUNDS)
-        * Matern(
-            length_scale=LENGTH_SCALE,
-            nu=MATERN_NU,
-            length_scale_bounds=LENGTH_SCALE_BOUNDS,
-        )
-    )
-    kernel_RBF_noise = (
-        ConstantKernel(CONSTANT_KERNEL_SCALE, constant_value_bounds=CONSTANT_SCALE_BOUNDS)
-        * RBF(length_scale=LENGTH_SCALE, length_scale_bounds=LENGTH_SCALE_BOUNDS)
-        + WhiteKernel(noise_level=WHITE_NOISE_LEVEL, noise_level_bounds=WHITE_NOISE_BOUNDS)
-    )
-
-    gp_RBF = GaussianProcessRegressor(
-        kernel=kernel_RBF,
-        alpha=GP_ALPHA,
-        optimizer=_gp_optimizer,
-        n_restarts_optimizer=_gp_n_restarts,
-        normalize_y=True,
-    )
-    gp_Matern = GaussianProcessRegressor(
-        kernel=kernel_Matern,
-        alpha=GP_ALPHA,
-        optimizer=_gp_optimizer,
-        n_restarts_optimizer=_gp_n_restarts,
-        normalize_y=True,
-    )
-    gp_RBF_noise = GaussianProcessRegressor(
-        kernel=kernel_RBF_noise,
-        alpha=GP_ALPHA,
-        optimizer=_gp_optimizer,
-        n_restarts_optimizer=_gp_n_restarts,
-        normalize_y=True,
-    )
-
-    gp_RBF.fit(X, y)
-    gp_Matern.fit(X, y)
-    gp_RBF_noise.fit(X, y)
-
-    gps = [
-        (gp_RBF, "RBF"),
-        (gp_Matern, "Matérn (ν=1.5)"),
-        (gp_RBF_noise, "RBF + WhiteKernel"),
-    ]
-
-    use_lml = _normalize_kernel_input(gp_kernel) is None
-    if use_lml:
-        lml_scores = {name: gp.log_marginal_likelihood_value_ for gp, name in gps}
-        best_name = max(lml_scores, key=lml_scores.get)
-    else:
-        resolved = _resolve_kernel_name(_normalize_kernel_input(gp_kernel))
-        if resolved is None:
-            lml_scores = {name: gp.log_marginal_likelihood_value_ for gp, name in gps}
-            best_name = max(lml_scores, key=lml_scores.get)
-        else:
-            best_name = resolved
-
-    best_gp = next(g for g, n in gps if n == best_name)
-    return best_gp, best_name
-
-
-def _slice_grids(n_slice: int = 50) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    ug = np.linspace(0, 1, n_slice)
+def _idw_grids(n_grid: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ug = np.linspace(0, 1, n_grid)
     Ug, Vg = np.meshgrid(ug, ug)
     return Ug, Vg, ug
 
 
-def build_slices_info(X: np.ndarray, Ug: np.ndarray, Vg: np.ndarray):
-    med = [float(np.median(X[:, k])) for k in range(3)]
-    return [
-        (
-            np.column_stack([Ug.ravel(), Vg.ravel(), np.full(Ug.size, med[2])]),
-            Ug,
-            Vg,
-            0,
-            1,
-            r"$x_1$",
-            r"$x_2$",
-            rf"$x_3$ = {med[2]:.2f}",
-        ),
-        (
-            np.column_stack([Ug.ravel(), np.full(Ug.size, med[1]), Vg.ravel()]),
-            Ug,
-            Vg,
-            0,
-            2,
-            r"$x_1$",
-            r"$x_3$",
-            rf"$x_2$ = {med[1]:.2f}",
-        ),
-        (
-            np.column_stack([np.full(Ug.size, med[0]), Ug.ravel(), Vg.ravel()]),
-            Ug,
-            Vg,
-            1,
-            2,
-            r"$x_2$",
-            r"$x_3$",
-            rf"$x_1$ = {med[0]:.2f}",
-        ),
-    ]
+def _idw_surfaces(X: np.ndarray, y: np.ndarray, Ug: np.ndarray, Vg: np.ndarray) -> list[np.ndarray]:
+    """One IDW (1 / d^2) surface per pair, matching Section 2's algebra."""
+    surfaces: list[np.ndarray] = []
+    grid_2d = np.column_stack([Ug.ravel(), Vg.ravel()])
+    for i, j, *_ in PAIRS:
+        obs_2d = np.column_stack([X[:, i], X[:, j]])
+        dist = np.sqrt(((grid_2d[:, None, :] - obs_2d[None, :, :]) ** 2).sum(axis=2)) + 1e-12
+        w = 1.0 / (dist**2)
+        Y_idw = (w * y[None, :]).sum(axis=1) / w.sum(axis=1)
+        surfaces.append(Y_idw.reshape(Ug.shape))
+    return surfaces
 
 
-def mu_ranges_for_prefix(
+def _global_color_range(
+    X_full: np.ndarray, y_full: np.ndarray, Ug: np.ndarray, Vg: np.ndarray, n_init: int
+) -> tuple[float, float]:
+    """Use the **final** IDW surface to fix colour limits — keeps frames comparable."""
+    surfaces = _idw_surfaces(X_full, y_full, Ug, Vg)
+    lo = float(min(np.nanmin(s) for s in surfaces))
+    hi = float(max(np.nanmax(s) for s in surfaces))
+    # Also fold the observed y range in case early frames push slightly outside.
+    lo = min(lo, float(y_full[:n_init].min()), float(y_full.min()))
+    hi = max(hi, float(y_full[:n_init].max()), float(y_full.max()))
+    if hi <= lo:
+        hi = lo + 1e-10
+    return lo, hi
+
+
+def _render_frame_png_bytes(
     X: np.ndarray,
     y: np.ndarray,
     *,
     Ug: np.ndarray,
     Vg: np.ndarray,
-    gp_kernel: str | None,
-    optimize_kernel: bool,
-    n_restarts_kernel: int,
-) -> list[tuple[float, float]]:
-    """Min/max of μ over each slice row for stable colour limits across frames."""
-    best_gp, _ = fit_best_gp(
-        X,
-        y,
-        gp_kernel=gp_kernel,
-        optimize_kernel=optimize_kernel,
-        n_restarts_kernel=n_restarts_kernel,
-    )
-    slices_info = build_slices_info(X, Ug, Vg)
-    ranges: list[tuple[float, float]] = []
-    for slice_pts, *_rest in slices_info:
-        mu_slice, _ = best_gp.predict(slice_pts, return_std=True)
-        mu_slice = mu_slice.reshape(Ug.shape)
-        lo, hi = float(np.nanmin(mu_slice)), float(np.nanmax(mu_slice))
-        if hi <= lo:
-            hi = lo + 1e-10
-        ranges.append((lo, hi))
-    return ranges
-
-
-def render_mean_row_png_bytes(
-    best_gp: GaussianProcessRegressor,
-    best_name: str,
-    X: np.ndarray,
-    *,
-    Ug: np.ndarray,
-    Vg: np.ndarray,
-    mu_ranges: list[tuple[float, float]],
-    warp_label: str,
+    levels: np.ndarray,
+    vmin: float,
+    vmax: float,
     n_obs: int,
     bo_rounds_done: int,
     dpi: float,
     figsize: tuple[float, float],
 ) -> bytes:
-    slices_info = build_slices_info(X, Ug, Vg)
+    norm = plt.Normalize(vmin=vmin, vmax=vmax)
+    surfaces = _idw_surfaces(X, y, Ug, Vg)
     fig, axes = plt.subplots(1, 3, figsize=figsize)
-    for ax, (slice_pts, Ag, Bg, ia, ib, la, lb, slice_label), (mu_lo, mu_hi) in zip(
-        axes, slices_info, mu_ranges, strict=True
-    ):
-        mu_slice, _ = best_gp.predict(slice_pts, return_std=True)
-        mu_slice = mu_slice.reshape(Ug.shape)
-        levels_mu = np.linspace(mu_lo, mu_hi, CONTOURF_LEVELS)
-        cf = ax.contourf(Ag, Bg, mu_slice, levels=levels_mu, cmap="viridis")
+    line_levels = levels[:: max(1, len(levels) // CONTOUR_LINE_LEVELS)]
+    for ax, (i, j, li, lj), Y_idw in zip(axes, PAIRS, surfaces, strict=True):
+        ax.contourf(Ug, Vg, Y_idw, levels=levels, cmap=CMAP, norm=norm)
         ax.contour(
-            Ag,
-            Bg,
-            mu_slice,
-            levels=np.linspace(mu_lo, mu_hi, CONTOUR_LINE_LEVELS),
-            colors="k",
+            Ug,
+            Vg,
+            Y_idw,
+            levels=line_levels,
+            colors="white",
             linewidths=CONTOUR_LINEWIDTH,
+            linestyles="-",
             alpha=CONTOUR_ALPHA,
-            linestyles=CONTOUR_LINESTYLE,
         )
-        plt.colorbar(cf, ax=ax, shrink=0.82).set_label(r"$\mu(\mathbf{x})$")
         ax.scatter(
-            X[:, ia],
-            X[:, ib],
+            X[:, i],
+            X[:, j],
             c="red",
-            s=55,
+            s=SCATTER_SIZE,
             edgecolors="k",
-            zorder=4,
-            linewidths=1.2,
+            linewidths=SCATTER_EDGE_LW,
+            zorder=2,
         )
-        for j in range(len(X)):
-            ax.annotate(
-                str(j + 1),
-                (float(X[j, ia]), float(X[j, ib])),
-                textcoords="offset points",
-                xytext=(3, 3),
-                fontsize=7,
+        for idx in range(len(y)):
+            ax.text(
+                float(X[idx, i]) + 0.02,
+                float(X[idx, j]) + 0.02,
+                str(idx + 1),
+                fontsize=8,
                 color="white",
-                zorder=5,
+                zorder=10,
             )
-        ax.set_xlabel(la)
-        ax.set_ylabel(lb)
-        ax.set_title(f"{best_name} — mean ({slice_label})", fontsize=10)
+        ax.set_xlabel(li)
+        ax.set_ylabel(lj)
+        ax.set_title(f"{li} vs {lj} (interpolated)")
         ax.set_aspect("equal")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
 
+    sm = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
+    sm.set_array([])
+    fig.colorbar(sm, ax=axes.ravel().tolist(), location="right", shrink=0.8, label="y", pad=0.02)
     fig.suptitle(
-        f"Function 3 — GP posterior mean (pairwise slices)  |  "
-        f"n = {n_obs} obs  |  BO rounds after warm-start: {bo_rounds_done}  |  warping: {warp_label}",
+        f"Function 3 — observations on pairwise projections (IDW)  |  "
+        f"n = {n_obs} obs  |  BO rounds after warm-start: {bo_rounds_done}",
         fontsize=11,
         y=1.02,
     )
-    fig.tight_layout()
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
     plt.close(fig)
@@ -338,15 +176,21 @@ def main() -> None:
     parser.add_argument(
         "--duration-ms",
         type=int,
-        default=550,
+        default=600,
         help="Display duration per frame in milliseconds",
+    )
+    parser.add_argument(
+        "--hold-last-ms",
+        type=int,
+        default=1800,
+        help="Hold the final frame longer (milliseconds)",
     )
     parser.add_argument("--dpi", type=float, default=110.0, help="Rasterisation DPI")
     parser.add_argument(
         "--figsize",
         type=float,
         nargs=2,
-        default=(13.0, 4.2),
+        default=F3_FIG_1X3,
         metavar=("W", "H"),
         help="Figure size in inches (width height)",
     )
@@ -366,7 +210,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    X_full, y_orig = load_problem_data_csv(args.csv)
+    X_full, y_full = load_problem_data_csv(args.csv)
     X_init, _ = load_function_data(3)
     n_init = len(X_init)
     if not args.no_verify_init:
@@ -383,56 +227,37 @@ def main() -> None:
             )
             sys.exit(1)
 
-    y_warped, warp_params, _msg = apply_output_warping(y_orig, mode=OUTPUT_WARPING)
-    warp_label = warp_params[0] if warp_params else "None"
-
-    Ug, Vg, _ = _slice_grids(50)
-
-    # Global μ colour limits per slice row (stable across animation)
-    mu_ranges_global = mu_ranges_for_prefix(
-        X_full,
-        y_warped,
-        Ug=Ug,
-        Vg=Vg,
-        gp_kernel=GP_KERNEL,
-        optimize_kernel=OPTIMIZE_KERNEL,
-        n_restarts_kernel=N_RESTARTS_KERNEL,
-    )
+    Ug, Vg, _ = _idw_grids(N_GRID)
+    vmin, vmax = _global_color_range(X_full, y_full, Ug, Vg, n_init)
+    levels = np.linspace(vmin, vmax, CONTOURF_LEVELS)
 
     frames: list[Image.Image] = []
-    for end in range(n_init, len(X_full) + 1):
-        X = X_full[:end]
-        y = y_warped[:end]
-        best_gp, best_name = fit_best_gp(
-            X,
-            y,
-            gp_kernel=GP_KERNEL,
-            optimize_kernel=OPTIMIZE_KERNEL,
-            n_restarts_kernel=N_RESTARTS_KERNEL,
-        )
-        bo_rounds = max(0, end - n_init)
-        png = render_mean_row_png_bytes(
-            best_gp,
-            best_name,
-            X,
+    n_total = len(X_full)
+    for end in range(n_init, n_total + 1):
+        png = _render_frame_png_bytes(
+            X_full[:end],
+            y_full[:end],
             Ug=Ug,
             Vg=Vg,
-            mu_ranges=mu_ranges_global,
-            warp_label=warp_label,
+            levels=levels,
+            vmin=vmin,
+            vmax=vmax,
             n_obs=end,
-            bo_rounds_done=bo_rounds,
+            bo_rounds_done=max(0, end - n_init),
             dpi=args.dpi,
             figsize=(args.figsize[0], args.figsize[1]),
         )
         frames.append(Image.open(io.BytesIO(png)).convert("RGB"))
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    duration = max(20, int(args.duration_ms))
+    base = max(20, int(args.duration_ms))
+    hold = max(base, int(args.hold_last_ms))
+    durations = [base] * (len(frames) - 1) + [hold]
     frames[0].save(
         args.output,
         save_all=True,
         append_images=frames[1:],
-        duration=duration,
+        duration=durations,
         loop=0,
         optimize=True,
     )
