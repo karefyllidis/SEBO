@@ -13,9 +13,26 @@
 
 ---
 
+## Skills Demonstrated
+
+This project is relevant to data science and ML engineering roles requiring **probabilistic modelling, experimental design, and AutoML**. The same techniques underpin real-world hyperparameter search, drug discovery, and materials optimisation pipelines.
+
+| Skill | Where in this repo |
+|---|---|
+| Gaussian Processes — kernel selection by LML (RBF, Matérn, RBF+WhiteKernel) | `src/optimizers/my_bayesian/my_gp_skopt.py` |
+| Sequential experimental design / active learning | All notebooks, `run_pipeline.py` |
+| Ensemble acquisition (EI + PI + UCB, centroid fallback) | `my_gp_skopt.py:suggest()`, model card |
+| Bayesian hyperparameter optimisation (HPO) applied to sklearn RF | `notebooks/demo_sklearn_hpo.ipynb` |
+| Output warping for skewed objectives (log, Box-Cox) | `src/utils/warping.py` |
+| Benchmark design — MyBO vs Optuna-TPE, Optuna-GP, TuRBO, DE-GP-EI | All notebooks Section 6, `run_optimizers_on_data.py` |
+| Stateful `suggest / observe` API (production-style optimizer class) | `src/optimizers/optimizer.py` |
+| ML documentation standards (model card, datasheet) | `docs/model_card.md`, `docs/datasheet.md` |
+
+---
+
 ## In Plain Language
 
-Imagine trying to find the highest point on a landscape you cannot see — you can only poke the ground with a stick and measure how high you are. This project does that for eight hidden mathematical problems: one measurement per problem per week. Instead of guessing randomly, it uses **Bayesian Optimisation** — a method that learns from past measurements and picks the next most informative spot. Over 13 weeks, scores improved strongly on all eight tasks (for example, one chemical-process output rose from about 1,700 to about 7,500) without ever seeing the true formulas. The **public repository** holds code and write-ups; raw evaluation files stay **local only** (see [below](#data-on-disk-vs-public-github)).
+Imagine trying to find the highest point on a landscape you cannot see — you can only poke the ground with a stick and measure how high you are. This project does that for eight hidden mathematical problems: one measurement per problem per week. Instead of guessing randomly, it uses **Bayesian Optimisation** — a method that learns from past measurements and picks the next most informative spot. Over 13 weeks, scores improved strongly on all eight tasks (for example, one chemical-process output rose from about 1,700 to about 7,500) without ever seeing the true formulas. The same technique is used in production for AutoML, drug discovery, A/B test design, and neural architecture search. The **public repository** holds code and write-ups; raw evaluation files stay **local only** (see [below](#data-on-disk-vs-public-github)).
 
 ---
 
@@ -217,10 +234,12 @@ black-box-optimization/
 │   ├── function_5_Chemical-Process-Yield.ipynb
 │   ├── function_6_Recipe-Optimization.ipynb
 │   ├── function_7_Hyperparameter-Tuning.ipynb
-│   └── function_8_High-dimensional-ML-Model.ipynb
+│   ├── function_8_High-dimensional-ML-Model.ipynb
+│   └── demo_sklearn_hpo.ipynb             # ← MyBO applied to real RF HPO; MyBO vs random search
 │
 ├── src/
 │   ├── optimizers/
+│   │   ├── optimizer.py                         # BayesianOptimizer class — stateful suggest/observe API
 │   │   ├── my_bayesian/my_gp_skopt.py          # GP+skopt BO (EI/PI/UCB/Thompson/Entropy Search)
 │   │   └── wrappers/                            # optuna_solver, turbo_solver, de_gp_ei_solver, hyperopt_solver
 │   └── utils/
@@ -266,6 +285,7 @@ black-box-optimization/
 
 | File | Contents |
 |------|----------|
+| [notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb) | **Start here** — MyBO applied to RandomForest HPO on Digits; MyBO vs random search |
 | [docs/datasheet.md](docs/datasheet.md) | Dataset datasheet — motivation, composition, collection, preprocessing, uses, licence |
 | [docs/model_card.md](docs/model_card.md) | Model card — architecture, latest performance summary, assumptions, limitations, ethical considerations |
 | [docs/TECHNICAL_FOUNDATIONS.md](docs/TECHNICAL_FOUNDATIONS.md) | BO theory, kernel choices, acquisition functions, key papers |
