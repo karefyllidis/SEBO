@@ -143,7 +143,7 @@ python append_results/run_optimizers_on_data.py --solvers my_bo optuna turbo de_
 
 **[notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb)** — self-contained, no oracle data needed. Tunes a `RandomForestClassifier` on sklearn's Digits dataset (4D search space: n_estimators, max_depth, min_samples_split, max_features). 10 LHS warm-start + 20 BO iterations vs 30 random search evaluations.
 
-**[notebooks/sebo_benchmark.ipynb](notebooks/sebo_benchmark.ipynb)** — SEBO vs Optuna-TPE vs TuRBO vs DE-GP-EI vs Random Search on 5 synthetic black-box functions spanning four orders of magnitude in output scale (log-warping on F3). 15 evaluations per function.
+**[notebooks/sebo_benchmark.ipynb](notebooks/sebo_benchmark.ipynb)** — SEBO vs Optuna-TPE vs TuRBO vs DE-GP-EI vs Random Search on 6 synthetic black-box functions spanning four orders of magnitude in output scale (log-warping on F3, asymmetric Gaussian peaks on F6). 15 evaluations per function.
 
 ![SEBO Benchmark Convergence](docs/sebo_benchmark_convergence.png)
 
