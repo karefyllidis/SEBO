@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Last Updated](https://img.shields.io/badge/Last%20Updated-May%202026-lightgrey)
+![Last Updated](https://img.shields.io/badge/Last%20Updated-June%202026-lightgrey)
 ![Rounds](https://img.shields.io/badge/Rounds-13-orange)
 ![Objectives](https://img.shields.io/badge/Objectives-8-purple)
 ![Status](https://img.shields.io/badge/NeurIPS%202020%20BBO-complete-success)
@@ -12,13 +12,24 @@
 
 ---
 
-I designed and implemented a GP-based sequential optimizer from scratch, applied it to the **[NeurIPS 2020 Black-Box Optimisation Challenge](https://neurips.cc/virtual/2020/protected/e_competitions.html)** format — 8 unknown objective functions (2D–8D), one evaluation per function per round, 13 rounds — and benchmarked it head-to-head against Optuna, TuRBO, and DE-GP-EI on identical observation histories. The core contribution is a full BO pipeline: automatic kernel selection by log-marginal likelihood, ensemble acquisition (EI + PI + UCB with centroid fallback), and output warping for skewed objectives. The same `suggest / observe` API generalises directly to **AutoML hyperparameter search**, drug discovery, and materials design — any setting where evaluations are expensive and every query counts.
+I designed and implemented a GP-based sequential optimizer from scratch, applied it to the **[NeurIPS 2020 Black-Box Optimisation Challenge](https://neurips.cc/virtual/2020/protected/e_competitions.html)** format — 8 unknown objective functions (2D–8D), one evaluation per function per round, 13 rounds — and benchmarked it head-to-head against common open-source solvers (Optuna-TPE, TuRBO, DE-GP-EI) on identical observation histories. The core contribution is a full BO pipeline: automatic kernel selection by log-marginal likelihood, ensemble acquisition (EI + PI + UCB with centroid fallback), and output warping for skewed objectives. The same `suggest / observe` API generalises directly to **AutoML hyperparameter search**, drug discovery, and materials design — any setting where evaluations are expensive and every query counts.
 
 ---
 
-## API
+## Use SEBO
+
+Clone and install — no pip package yet (Docker image coming):
+
+```bash
+git clone https://github.com/karefyllidis/SEBO.git
+cd SEBO
+pip install -r requirements.txt
+```
 
 ```python
+import sys
+sys.path.insert(0, ".")
+
 from src.optimizers.optimizer import BayesianOptimizer
 
 optimizer = BayesianOptimizer(
@@ -36,7 +47,19 @@ for _ in range(n_rounds):
 print(optimizer.best)   # (best_x, best_y)
 ```
 
-Drop-in for any black-box maximization problem: hyperparameter search, design of experiments, simulation optimization.
+See [notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb) for a fully worked example — no external data required.
+
+---
+
+## Benchmark
+
+**[notebooks/sebo_benchmark.ipynb](notebooks/sebo_benchmark.ipynb)** — SEBO (built from scratch) benchmarked against common open-source solvers — Optuna-TPE, TuRBO, DE-GP-EI, and Random Search — on 6 synthetic black-box functions spanning four orders of magnitude in output scale (log-warping on F3, asymmetric Gaussian peaks on F6). Adaptive stopping: all solvers halt as soon as any one reaches ≥99% of the true maximum (cap: 80 evaluations) — each subplot shows a different evaluation count depending on function difficulty.
+
+![SEBO Benchmark Convergence](docs/sebo_benchmark_convergence.png)
+
+*Incumbent best-y convergence. Green band = LHS warm-start. Dashed black line = true maximum. Dash-dot vertical line = stopping point (first solver to reach ≥99% of true max).*
+
+**[notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb)** — self-contained HPO demo. Tunes a `RandomForestClassifier` on sklearn's Digits dataset (4D search space: n_estimators, max_depth, min_samples_split, max_features). 10 LHS warm-start + 20 BO iterations vs 30 random search evaluations.
 
 ---
 
@@ -84,18 +107,6 @@ Full per-round strategy notes and GP diagnostics: [docs/model_card.md](docs/mode
 
 ---
 
-## Why This Matters — Real-World Applications
-
-The BO loop in SEBO is the same engine used by **Optuna, SMAC, and Ax** internally. Building it from scratch makes every design decision explicit and auditable.
-
-- **AutoML / Hyperparameter Optimisation** — GP surrogate replaces grid/random search; finds better configs in fewer model-training calls. Demonstrated directly in the [HPO demo](notebooks/demo_sklearn_hpo.ipynb): SEBO tunes a RandomForest on Digits using 30 evaluations and consistently outperforms random search.
-- **Drug Discovery & Materials Science** — sample-efficient search over molecular or material property spaces where each lab measurement is costly (F3 analogue: drug potency proxy).
-- **Simulation Optimisation** — engineering or physics simulations where one run takes minutes to hours; BO is the standard approach for tuning parameters.
-- **Neural Architecture Search** — treating layer widths, learning rates, and dropout as a continuous search space; same GP + acquisition loop applies.
-- **Sequential Experiment Design** — A/B tests, clinical dose-finding, adaptive sampling — any setting where observations arrive one at a time and each one is expensive.
-
----
-
 ## Methodology
 
 **Bayesian Optimisation** maintains a probabilistic surrogate (GP) over the unknown function and uses it to select the next query — balancing exploitation of known good regions against exploration of uncertain ones.
@@ -118,84 +129,15 @@ For objectives spanning orders of magnitude (e.g. F5: values from ~1700 to ~7500
 
 ---
 
-## Solver Benchmarks
+## Why This Matters — Real-World Applications
 
-Each notebook §6 compares SEBO against four open-source solvers on the **same observation history**:
+The BO loop in SEBO is the same engine used by **Optuna, SMAC, and Ax** internally. Building it from scratch makes every design decision explicit and auditable.
 
-| Solver | Method |
-|--------|--------|
-| **Optuna-TPE** | Tree-structured Parzen Estimator |
-| **Optuna-GP** | Optuna's GP backend |
-| **TuRBO** | Trust-Region Bayesian Optimisation |
-| **DE-GP-EI** | Differential Evolution with GP-EI |
-
-Run standalone:
-```bash
-pip install -r requirements-benchmark.txt
-python append_results/run_optimizers_on_data.py --solvers my_bo optuna turbo de_gp_ei
-```
-
----
-
-## Demo — SEBO as an HPO Solver
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/karefyllidis/SEBO/blob/main/notebooks/demo_sklearn_hpo.ipynb)
-
-**[notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb)** — self-contained, no oracle data needed. Tunes a `RandomForestClassifier` on sklearn's Digits dataset (4D search space: n_estimators, max_depth, min_samples_split, max_features). 10 LHS warm-start + 20 BO iterations vs 30 random search evaluations.
-
-**[notebooks/sebo_benchmark.ipynb](notebooks/sebo_benchmark.ipynb)** — SEBO (built from scratch) benchmarked against common open-source solvers — Optuna-TPE, TuRBO, DE-GP-EI, and Random Search — on 6 synthetic black-box functions spanning four orders of magnitude in output scale (log-warping on F3, asymmetric Gaussian peaks on F6). 20 evaluations per function.
-
-![SEBO Benchmark Convergence](docs/sebo_benchmark_convergence.png)
-
-*Incumbent best-y convergence across 15 evaluations per function. Green band = LHS warm-start. Dashed black line = true maximum.*
-
----
-
-## Use SEBO in Your Project
-
-Clone and install dependencies — no pip package yet (Docker image coming):
-
-```bash
-git clone https://github.com/karefyllidis/SEBO.git
-cd SEBO
-pip install -r requirements.txt
-```
-
-Then use the `suggest / observe` API directly in your code:
-
-```python
-import sys
-sys.path.insert(0, ".")   # or add SEBO to your PYTHONPATH
-
-from src.optimizers.optimizer import BayesianOptimizer
-
-optimizer = BayesianOptimizer(bounds=[(0.0, 1.0)] * 4, output_warping="log")
-optimizer.fit(X_init, y_init)
-
-for _ in range(n_rounds):
-    x_next = optimizer.suggest()
-    y_next = your_function(x_next)
-    optimizer.observe(x_next, y_next)
-
-print(optimizer.best)   # (best_x, best_y)
-```
-
-See [notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb) for a fully worked example — no external data required.
-
----
-
-## Quick Start (NeurIPS pipeline)
-
-```bash
-pip install -r requirements.txt
-python run_pipeline.py
-```
-
-Options:
-- `--skip-notebooks` — print previously saved outputs without re-running notebooks
-- `--skip-scripts` — skip `append_results/*.py` (use when observation history is already present)
-
-> **Note on data:** Raw evaluation CSVs (`data/problems/`, `initial_data/`) are gitignored. The demo notebook and all pipeline logic run without them; GP evolution plots require local `observations.csv` files.
+- **AutoML / Hyperparameter Optimisation** — GP surrogate replaces grid/random search; finds better configs in fewer model-training calls. Demonstrated directly in the [HPO demo](notebooks/demo_sklearn_hpo.ipynb): SEBO tunes a RandomForest on Digits using 30 evaluations and consistently outperforms random search.
+- **Drug Discovery & Materials Science** — sample-efficient search over molecular or material property spaces where each lab measurement is costly (F3 analogue: drug potency proxy).
+- **Simulation Optimisation** — engineering or physics simulations where one run takes minutes to hours; BO is the standard approach for tuning parameters.
+- **Neural Architecture Search** — treating layer widths, learning rates, and dropout as a continuous search space; same GP + acquisition loop applies.
+- **Sequential Experiment Design** — A/B tests, clinical dose-finding, adaptive sampling — any setting where observations arrive one at a time and each one is expensive.
 
 ---
 
@@ -206,6 +148,7 @@ sebo/
 │
 ├── notebooks/
 │   ├── function_{1..8}_*.ipynb         # One notebook per objective — full BO pipeline
+│   ├── sebo_benchmark.ipynb            # Head-to-head benchmark vs open-source solvers
 │   └── demo_sklearn_hpo.ipynb          # Standalone HPO demo — start here
 │
 ├── src/
@@ -221,7 +164,7 @@ sebo/
 │
 ├── append_results/
 │   ├── append_week{1..13}_results.py  # Round-append scripts (idempotent)
-│   └── run_optimizers_on_data.py      # Benchmark all solvers
+│   └── run_optimizers_on_data.py      # Benchmark all solvers on oracle data
 │
 ├── scripts/
 │   └── export_function3_gp_evolution_gif.py
@@ -237,16 +180,7 @@ sebo/
 └── requirements-benchmark.txt
 ```
 
----
-
-## Documentation
-
-| File | Contents |
-|------|----------|
-| [notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb) | **Start here** — self-contained HPO demo |
-| [docs/model_card.md](docs/model_card.md) | Architecture, per-round performance, limitations |
-| [docs/datasheet.md](docs/datasheet.md) | Data provenance, composition, collection, uses |
-| [docs/TECHNICAL_FOUNDATIONS.md](docs/TECHNICAL_FOUNDATIONS.md) | BO theory, kernel selection, acquisition functions, references |
+> **Note on data:** Raw evaluation CSVs (`data/problems/`, `initial_data/`) are gitignored. The demo and benchmark notebooks run without them; GP evolution plots require local `observations.csv` files.
 
 ---
 
