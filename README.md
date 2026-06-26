@@ -143,7 +143,7 @@ python append_results/run_optimizers_on_data.py --solvers my_bo optuna turbo de_
 
 **[notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb)** — self-contained, no oracle data needed. Tunes a `RandomForestClassifier` on sklearn's Digits dataset (4D search space: n_estimators, max_depth, min_samples_split, max_features). 10 LHS warm-start + 20 BO iterations vs 30 random search evaluations.
 
-**[notebooks/sebo_benchmark.ipynb](notebooks/sebo_benchmark.ipynb)** — SEBO (built from scratch) benchmarked against common open-source solvers — Optuna-TPE, TuRBO, DE-GP-EI, and Random Search — on 6 synthetic black-box functions spanning four orders of magnitude in output scale (log-warping on F3, asymmetric Gaussian peaks on F6). 15 evaluations per function.
+**[notebooks/sebo_benchmark.ipynb](notebooks/sebo_benchmark.ipynb)** — SEBO (built from scratch) benchmarked against common open-source solvers — Optuna-TPE, TuRBO, DE-GP-EI, and Random Search — on 6 synthetic black-box functions spanning four orders of magnitude in output scale (log-warping on F3, asymmetric Gaussian peaks on F6). 20 evaluations per function.
 
 ![SEBO Benchmark Convergence](docs/sebo_benchmark_convergence.png)
 
@@ -151,7 +151,40 @@ python append_results/run_optimizers_on_data.py --solvers my_bo optuna turbo de_
 
 ---
 
-## Quick Start
+## Use SEBO in Your Project
+
+Clone and install dependencies — no pip package yet (Docker image coming):
+
+```bash
+git clone https://github.com/karefyllidis/SEBO.git
+cd SEBO
+pip install -r requirements.txt
+```
+
+Then use the `suggest / observe` API directly in your code:
+
+```python
+import sys
+sys.path.insert(0, ".")   # or add SEBO to your PYTHONPATH
+
+from src.optimizers.optimizer import BayesianOptimizer
+
+optimizer = BayesianOptimizer(bounds=[(0.0, 1.0)] * 4, output_warping="log")
+optimizer.fit(X_init, y_init)
+
+for _ in range(n_rounds):
+    x_next = optimizer.suggest()
+    y_next = your_function(x_next)
+    optimizer.observe(x_next, y_next)
+
+print(optimizer.best)   # (best_x, best_y)
+```
+
+See [notebooks/demo_sklearn_hpo.ipynb](notebooks/demo_sklearn_hpo.ipynb) for a fully worked example — no external data required.
+
+---
+
+## Quick Start (NeurIPS pipeline)
 
 ```bash
 pip install -r requirements.txt
