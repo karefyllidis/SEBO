@@ -1,55 +1,53 @@
-# Technical foundations
+# Technical Foundations
 
-Short reference for the main justification, key literature, and library choices behind this BBO capstone. See README Section 4 (Technical approach) and References for full detail.
-
----
-
-## Main justification
-
-- **Approach:** Bayesian optimisation (BO) with a **Gaussian process (GP) surrogate** and an **acquisition function** (Expected Improvement, EI; or UCB, PI).
-- **Prior research:** BO is the standard sample-efficient framework for expensive black-box objectives with limited evaluations; the loop (fit surrogate → maximise acquisition → evaluate → update) is well understood and has theoretical support (e.g. regret bounds).
-- **Established benchmark:** The **NeurIPS 2020 BBO Challenge** used the same suggest–observe API; many competitive entries used GP surrogates and EI/UCB-style acquisition (skopt, TuRBO, team submissions). Our design aligns with this benchmark.
-- **Why GPs:** They provide a predictive mean and **uncertainty** σ(x) natively (required by EI/UCB), are data-efficient for small n (10–20+ points per function), and scale to our dimensions (2D–8D).
-- **Exploration vs exploitation in the notebooks:** EI/PI use skopt’s **ξ** (`XI_EI_PI`); UCB/LCB use **κ** (`KAPPA_UCB`). Smaller ξ and smaller κ generally favour **refinement near the incumbent** (exploitation). **Ensemble:** if the three acquisition argmaxes are close in L2 (below `AGREE_THRESHOLD`), the pipeline uses **EI**; otherwise the **centroid**—see README and [model_card.md](model_card.md#model-description) for the late-round per-function values currently in use.
-- **Output warping:** When y spans many orders of magnitude or is heavily skewed, the GP fit and uncertainty can be poor. We optionally transform y before fitting (HEBO-inspired): **log** or **Box–Cox** of a shifted y (so all values &gt; 0). The GP and acquisition use the warped y; the suggested next x is unchanged in input space. Implemented in `src/utils/warping.py` (`apply_output_warping`). Mode `None` or string `"none"` (case-insensitive) performs no transform. **When to use:** F1 (sparse tiny y), F5 (y ~0.1–1e3), F7 (y ~0.003–1.4) use `OUTPUT_WARPING = "log"` by default; F2, F3, F4, F6, F8 use `None`. Use `"log"` or `"boxcox"` when y is multi-scale or right-skewed; leave `None` when y is well-behaved.
+Reference for the design decisions, key literature, and library choices behind SEBO.
 
 ---
 
-## Key papers and ideas
+## Core Approach
 
-| Source | Idea / technique | How it strengthens this project |
+- **Method:** Bayesian optimisation (BO) with a **Gaussian process (GP) surrogate** and an acquisition function (EI, PI, UCB).
+- **Why BO:** Standard sample-efficient framework for expensive black-box objectives with limited evaluations. The loop (fit surrogate → maximise acquisition → evaluate → update) has theoretical regret bounds and is well-validated in practice.
+- **Why GPs:** They provide a predictive mean and **uncertainty** σ(x) natively (required by EI/UCB), are data-efficient for small n (10–50 points), and scale to the target dimensions (2D–8D).
+- **Ensemble acquisition:** If EI, PI, and UCB argmaxes are close in L2 (below `AGREE_THRESHOLD`), SEBO uses EI; otherwise the centroid — avoids over-committing to one strategy when acquisitions disagree.
+- **Output warping:** When y spans many orders of magnitude or is heavily skewed, the GP is fitted on `log` or `Box-Cox` transformed targets (HEBO-inspired). The surrogate and acquisition operate in warped space; raw y is stored and reported. Implemented in `src/utils/warping.py`.
+
+---
+
+## Key Papers
+
+| Source | Idea / technique | Application in SEBO |
 |--------|------------------|---------------------------------|
-| **Rasmussen & Williams**, *Gaussian Processes for Machine Learning* | GP regression as a distribution over functions; kernel choice (RBF, Matérn); hyperparameters via log-marginal likelihood (LML) | Justifies the surrogate (calibrated uncertainty, kernel selection); kernel choice (RBF, Matérn, RBF+WhiteKernel with LML) is traceable to established practice. |
-| **Jones et al.** (Expected Improvement) | EI as an acquisition function balancing exploration and exploitation using μ and σ | Gives a principled, non–ad hoc criterion for the next query. |
-| **NeurIPS 2020 BBO Challenge** (organisers’ report, starter kit) | Suggest–observe API; space-filling candidates (Sobol); avoidance of re-querying the same points | Aligns implementation with a comparable benchmark and challenge-tested methods; supports duplicate-avoidance (e.g. MIN_DIST_THRESHOLD) and Sobol candidates. |
-| **HEBO-style output warping** (e.g. log/Box–Cox of y) | Transform response before GP fit to stabilize variance when y is skewed or multi-scale | Justifies optional `OUTPUT_WARPING` in all notebooks; default `"log"` for F1, F5, F7; `None` for others. |
+| **Rasmussen & Williams**, *Gaussian Processes for Machine Learning* | GP regression; kernel choice (RBF, Matérn); hyperparameters via log-marginal likelihood | Justifies surrogate choice and kernel selection by LML |
+| **Jones et al.** (1998) — Expected Improvement | EI as a principled acquisition balancing exploration and exploitation | Primary acquisition function; used in ensemble |
+| **NeurIPS 2020 BBO Challenge** | Suggest–observe API; space-filling candidates (Sobol); avoidance of re-querying | Aligns implementation with a validated benchmark; motivates duplicate-avoidance and Sobol candidates |
+| **HEBO** (Cowen-Rivers et al., 2022) | Output warping (log/Box-Cox of y before GP fit) | `OUTPUT_WARPING` in all notebooks; default `"log"` for skewed objectives |
+| **TuRBO** (Eriksson et al., 2019) | Trust-region BO for high-dimensional spaces | Baseline in `sebo_benchmark.ipynb` via `src/optimizers/wrappers/turbo_solver.py` |
 
 ---
 
-## Third-party libraries (role and justification)
+## Library Choices
 
-| Library | Role | Why chosen over alternatives |
+| Library | Role | Why chosen |
 |---------|------|------------------------------|
-| **scikit-learn** (`GaussianProcessRegressor`) | Core GP surrogate (fit, predict mean and std) | Stable API, built-in LML-based kernel optimisation, good behaviour for small n. **GPyTorch** would scale better to large n but adds complexity and is unnecessary for our evaluation budget. |
-| **scikit-optimize (skopt)** (`gaussian_ei`, `gaussian_pi`, `gaussian_lcb`; `Sobol`, `Lhs`) | Compute EI/PI/UCB over a candidate set; generate space-filling candidates | Widely used in BO tutorials and NeurIPS 2020 starter kit; Sobol gives low-discrepancy coverage. We also implement EI/UCB/PI in `src/optimizers/my_bayesian/` for transparency; notebooks use skopt for consistency. |
-| **NumPy, SciPy, Matplotlib** | Numerical computation and visualisation | Standard, stable stack. **PyTorch/TensorFlow** not chosen: surrogate is a GP, not a neural network; for our data size, a GP is more data-efficient and provides uncertainty without extra machinery. |
-| **SciPy** (`scipy.optimize.differential_evolution`) | **DE-GP-EI** (`de_gp_ei_solver.py`): maximise GP Expected Improvement continuously on \([0,1]^d\) | Same BO idea as the notebooks (fit GP → optimise acquisition); DE is only applied to the **surrogate** acquisition, not a genetic algorithm on the black-box \(f\). User-facing name **DE-GP-EI**; CLI `de_gp_ei` / `ga` in `run_optimizers_on_data.py`. Per-function defaults: `configs/de_gp_ei_optimizer.yaml`. |
+| **scikit-learn** (`GaussianProcessRegressor`) | Core GP surrogate | Stable API, built-in LML kernel optimisation, good for small n. GPyTorch would scale better but adds unnecessary complexity for this budget. |
+| **scikit-optimize (skopt)** | Compute EI/PI/UCB; generate Sobol/LHS candidates | Widely used in BO; Sobol gives low-discrepancy coverage; used in NeurIPS 2020 starter kit. |
+| **SciPy** (`differential_evolution`) | DE-GP-EI baseline: maximise GP-EI continuously on [0,1]^d | Continuous acquisition maximisation for the DE-GP-EI comparison solver. |
+| **BoTorch / TuRBO** | TuRBO baseline | Trust-region BO for the benchmark comparison. |
+| **Optuna** | TPE baseline | Standard open-source HPO solver for comparison. |
+| **NumPy, Matplotlib** | Numerical computation and visualisation | Standard, stable stack. |
 
 ---
 
-## Where this is documented in the repo
+## Where to Find It
 
-- **README.md** — overview, structure, workflow, references.
-- **docs/project_roadmap.md** — layout, Section 6 solvers, `run_pipeline.py`, optimizer YAML under `configs/`.
-- **docs/Capstone_Project_FAQs.md** — capstone-specific Q&A.
-- **Notebooks** — per-function params and Section 6 comparison plots.
-- **submission-template/** — portfolio sheet / model card.
-- **docs_private/** — private notes; **`unused_or_removable_inventory.md`** = short cleanup checklist.
-
----
-
-## Additional sources (for ongoing refinement)
-
-- **Research:** NeurIPS 2020 BBO team write-ups (e.g. Huawei HEBO, Nvidia ensembles, JetBrains GP+SVM); TuRBO and trust-region BO for high dimensions.
-- **Benchmarks:** Bayesmark (from BBO starter kit); HPOBench or similar BO benchmarks.
-- **Software:** hyperopt, nevergrad (starter kit); GPyTorch/BoTorch if budget or dimension grows; population-based optimisers on \(f\) (distinct from DE-GP-EI on GP-EI) for multimodal baselines.
+| File | Contents |
+|------|----------|
+| `src/optimizers/optimizer.py` | `BayesianOptimizer` — stateful `suggest / observe` API |
+| `src/optimizers/my_bayesian/my_gp_skopt.py` | GP surrogate + ensemble acquisition (EI/PI/UCB) |
+| `src/optimizers/wrappers/` | Optuna, TuRBO, DE-GP-EI, Hyperopt solver wrappers |
+| `src/utils/warping.py` | Log / Box-Cox output warping |
+| `src/utils/sampling_utils.py` | Sobol / LHS candidate generation |
+| `notebooks/sebo_benchmark.ipynb` | Head-to-head benchmark with adaptive stopping |
+| `notebooks/demo_sklearn_hpo.ipynb` | Self-contained HPO demo on sklearn Digits |
+| `docs/model_card.md` | Architecture, performance, limitations |
