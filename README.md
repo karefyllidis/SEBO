@@ -2,6 +2,7 @@
 
 **Author:** [Nikolas Karefyllidis, PhD](https://www.linkedin.com/in/karefyllidis/)
 
+![PyPI](https://img.shields.io/pypi/v/sebo?color=blue)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Last Updated](https://img.shields.io/badge/Last%20Updated-June%202026-lightgrey)
@@ -19,19 +20,19 @@ I designed and implemented a GP-based sequential optimizer from scratch, applied
 ## Use SEBO
 
 ```bash
-pip install git+https://github.com/karefyllidis/SEBO.git
+pip install sebo
+```
+
+With benchmark solvers (Optuna, TuRBO):
+
+```bash
+pip install "sebo[benchmark]"
 ```
 
 Or clone for development:
 
 ```bash
 git clone https://github.com/karefyllidis/SEBO.git && cd SEBO && pip install -e .
-```
-
-With benchmark solvers (Optuna, TuRBO):
-
-```bash
-pip install "sebo[benchmark] @ git+https://github.com/karefyllidis/SEBO.git"
 ```
 
 ```python
