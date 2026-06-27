@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sebo"
+version = "0.1.0"
+description = "Sample-Efficient Bayesian Optimizer — GP surrogate with ensemble acquisition"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Nikolas Karefyllidis", email = "karefyllidis@gmail.com" }]
+requires-python = ">=3.10"
+keywords = ["bayesian-optimization", "gaussian-process", "hyperparameter-optimization", "black-box-optimization"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.2",
+    "scikit-optimize>=0.9",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+benchmark = [
+    "optuna>=3.0",
+    "torch>=2.0",
+    "botorch>=0.9",
+]
+notebook = [
+    "nbformat>=5.7",
+    "nbconvert>=7.0",
+    "ipykernel>=6.0",
+]
+all = ["sebo[benchmark,notebook]"]
+
+[project.urls]
+Homepage = "https://github.com/karefyllidis/SEBO"
+Repository = "https://github.com/karefyllidis/SEBO"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sebo*", "src*"]
+
+[tool.setuptools.package-data]
+"*" = ["configs/**/*.yaml", "configs/**/*.yml"]

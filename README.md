@@ -18,19 +18,24 @@ I designed and implemented a GP-based sequential optimizer from scratch, applied
 
 ## Use SEBO
 
-Clone and install — no pip package yet (Docker image coming):
+```bash
+pip install git+https://github.com/karefyllidis/SEBO.git
+```
+
+Or clone for development:
 
 ```bash
-git clone https://github.com/karefyllidis/SEBO.git
-cd SEBO
-pip install -r requirements.txt
+git clone https://github.com/karefyllidis/SEBO.git && cd SEBO && pip install -e .
+```
+
+With benchmark solvers (Optuna, TuRBO):
+
+```bash
+pip install "sebo[benchmark] @ git+https://github.com/karefyllidis/SEBO.git"
 ```
 
 ```python
-import sys
-sys.path.insert(0, ".")
-
-from src.optimizers.optimizer import BayesianOptimizer
+from sebo import BayesianOptimizer
 
 optimizer = BayesianOptimizer(
     bounds=[(0.0, 1.0)] * 4,   # search space — any dimension
